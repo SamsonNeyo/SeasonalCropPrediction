@@ -10,6 +10,7 @@ import {
   User,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { FirebaseError } from 'firebase/app';
 import { auth, db } from '../config/firebase';
 
 type AuthContextType = {
@@ -26,6 +27,41 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+
+const getAuthErrorMessage = (error: unknown) => {
+  if (error instanceof FirebaseError) {
+    switch (error.code) {
+      case 'auth/invalid-credential':
+        return 'Incorrect email or password.';
+      case 'auth/user-not-found':
+        return 'No account found with that email.';
+      case 'auth/wrong-password':
+        return 'Incorrect password.';
+      case 'auth/invalid-email':
+        return 'Please enter a valid email address.';
+      case 'auth/email-already-in-use':
+        return 'That email is already in use.';
+      case 'auth/weak-password':
+        return 'Password is too weak (min 6 characters).';
+      case 'auth/too-many-requests':
+        return 'Too many attempts. Please wait and try again.';
+      case 'auth/network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      case 'auth/user-disabled':
+        return 'This account has been disabled.';
+      case 'auth/operation-not-allowed':
+        return 'Email/password sign-in is not enabled in Firebase Auth.';
+      case 'auth/invalid-continue-uri':
+      case 'auth/missing-continue-uri':
+      case 'auth/unauthorized-continue-uri':
+        return 'Password reset link configuration is invalid. Check Firebase Auth authorized domains.';
+      default:
+        return error.message || 'Authentication failed.';
+    }
+  }
+  if (error instanceof Error) return error.message;
+  return 'Authentication failed.';
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -48,17 +84,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+    } catch (e) {
+      throw new Error(getAuthErrorMessage(e));
+    }
   };
 
   const signup = async (email: string, password: string, name: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await sendEmailVerification(cred.user);
-    await setDoc(doc(db, 'users', cred.user.uid), { name, soilType: 'Loam' });
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+      await sendEmailVerification(cred.user);
+      await setDoc(doc(db, 'users', cred.user.uid), { name, soilType: 'Loam' });
+    } catch (e) {
+      throw new Error(getAuthErrorMessage(e));
+    }
   };
 
-  const logout = async () => await signOut(auth);
-  const resetPassword = async (email: string) => await sendPasswordResetEmail(auth, email);
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      throw new Error(getAuthErrorMessage(e));
+    }
+  };
+  const resetPassword = async (email: string) => {
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const redirectUrl = process.env.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT?.trim();
+
+      if (redirectUrl) {
+        await sendPasswordResetEmail(auth, normalizedEmail, { url: redirectUrl });
+      } else {
+        await sendPasswordResetEmail(auth, normalizedEmail);
+      }
+    } catch (e) {
+      throw new Error(getAuthErrorMessage(e));
+    }
+  };
   const updateUserData = async (data: Record<string, any>) => {
     if (!user) return;
     const docRef = doc(db, 'users', user.uid);

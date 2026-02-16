@@ -10,11 +10,21 @@ const getDevHost = () => {
   return hostUri.split(':')[0];
 };
 
+const getWebHost = () => {
+  if (typeof window === 'undefined') return '';
+  return window.location?.hostname || '';
+};
+
 export const API_BASE = (() => {
   const envBase = process.env.EXPO_PUBLIC_API_BASE;
   if (envBase) return envBase;
 
   const host = getDevHost();
+  const webHost = getWebHost();
+
+  if (Platform.OS === 'web') {
+    return webHost ? `http://${webHost}:8000` : 'http://localhost:8000';
+  }
 
   if (Platform.OS === 'android') {
     // Prefer LAN host for Expo Go on device, fallback to emulator bridge.
@@ -31,7 +41,7 @@ export const API_BASE = (() => {
 
 export const api = axios.create({
   baseURL: API_BASE,
-  timeout: 20000,
+  timeout: 40000,
 });
 
 export const predictCrops = async (data: {

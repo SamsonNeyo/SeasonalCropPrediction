@@ -1,8 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator, SafeAreaView, Animated, Easing } from 'react-native';
-import { COLORS } from '../constants/colors';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, Image, ActivityIndicator, Animated, Easing } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 
 const SplashScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const fadeIn = useRef(new Animated.Value(0)).current;
   const rise = useRef(new Animated.Value(10)).current;
   const pulse = useRef(new Animated.Value(1)).current;
@@ -52,40 +56,41 @@ const SplashScreen = () => {
         />
         <Text style={styles.title}>SmartCrop</Text>
         <Text style={styles.subtitle}>Smart farming for every season</Text>
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 28 }} />
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 28 }} />
       </Animated.View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     justifyContent: 'center',
   },
   content: { alignItems: 'center', paddingHorizontal: 24 },
-  logo: { width: 140, height: 140, marginBottom: 20 },
-  title: { fontSize: 34, fontWeight: '800', color: COLORS.primary, letterSpacing: 0.5 },
-  subtitle: { fontSize: 16, color: COLORS.secondary, marginTop: 10, textAlign: 'center' },
+  logo: { width: 96, height: 96, marginBottom: 20 },
+  title: { fontFamily: FONT_FAMILY, fontSize: TYPE.display, fontWeight: WEIGHT.bold, color: colors.primary, letterSpacing: 0.5 },
+  subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, color: colors.secondary, marginTop: 10, textAlign: 'center', opacity: 0.9 },
   bgOrbOne: {
+    position: 'absolute',
+    width: 270,
+    height: 270,
+    borderRadius: 135,
+    backgroundColor: colors.iconBg,
+    top: -55,
+    right: -75,
+    opacity: 0.82,
+  },
+  bgOrbTwo: {
     position: 'absolute',
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: '#E1EFE1',
-    top: -40,
-    right: -60,
-    opacity: 0.8,
-  },
-  bgOrbTwo: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: '#F3EBD8',
-    bottom: -40,
-    left: -40,
+    backgroundColor: colors.pillBg,
+    bottom: -50,
+    left: -50,
     opacity: 0.9,
   },
 });

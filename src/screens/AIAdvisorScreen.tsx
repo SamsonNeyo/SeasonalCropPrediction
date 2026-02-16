@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,14 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   Animated,
   Easing,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../context/ThemeContext';
 import { getAIAdvice } from '../services/openai';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 
 const QUICK_PROMPTS = [
   'Best crops for first season in Luwero',
@@ -23,6 +24,8 @@ const QUICK_PROMPTS = [
 ];
 
 const AIAdvisorScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [prompt, setPrompt] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
@@ -75,7 +78,7 @@ const AIAdvisorScreen = () => {
           ]}
         >
           <View style={styles.headerIcon}>
-            <MaterialCommunityIcons name="brain" size={24} color={COLORS.primary} />
+          <MaterialCommunityIcons name="brain" size={24} color={colors.primary} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.title}>AI Advisor</Text>
@@ -103,7 +106,7 @@ const AIAdvisorScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="Type your question here..."
-            placeholderTextColor={COLORS.lightText}
+          placeholderTextColor={colors.lightText}
           value={prompt}
           onChangeText={setPrompt}
           multiline
@@ -124,10 +127,10 @@ const AIAdvisorScreen = () => {
           disabled={loading || !prompt.trim()}
         >
           {loading ? (
-            <ActivityIndicator color={COLORS.white} />
+              <ActivityIndicator color={colors.white} />
           ) : (
             <>
-              <MaterialCommunityIcons name="star-four-points" size={18} color={COLORS.white} />
+              <MaterialCommunityIcons name="star-four-points" size={18} color={colors.white} />
               <Text style={styles.primaryButtonText}>Ask Advisor</Text>
             </>
           )}
@@ -165,8 +168,9 @@ const AIAdvisorScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 28 },
   header: {
     flexDirection: 'row',
@@ -174,54 +178,60 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EAF4EA',
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.iconBg,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   headerText: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: COLORS.primary, letterSpacing: 0.2 },
-  subtitle: { fontSize: 14, color: COLORS.lightText, marginTop: 2 },
+  title: { fontFamily: FONT_FAMILY, fontSize: TYPE.h2, fontWeight: WEIGHT.bold, color: colors.primary, letterSpacing: 0.2 },
+  subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 2 },
   card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 2,
   },
-  label: { fontSize: 14, fontWeight: '600', color: COLORS.secondary, marginBottom: 8 },
+  label: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 8 },
   input: {
     minHeight: 90,
     borderWidth: 1,
-    borderColor: '#e1e1e1',
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: 13,
     padding: 12,
     marginBottom: 14,
-    backgroundColor: '#fafafa',
-    color: COLORS.text,
+    backgroundColor: colors.inputBg,
+    color: colors.text,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.body,
     textAlignVertical: 'top',
   },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: {
-    backgroundColor: '#F3F4F0',
+    backgroundColor: colors.chipBg,
     borderRadius: 16,
     paddingVertical: 6,
     paddingHorizontal: 10,
     marginRight: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e6e6e6',
+    borderColor: colors.chipBorder,
   },
-  chipText: { fontSize: 12, color: COLORS.text },
+  chipText: { fontSize: TYPE.caption, color: colors.text, fontFamily: FONT_FAMILY },
   primaryButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -232,19 +242,19 @@ const styles = StyleSheet.create({
   primaryButtonDisabled: {
     backgroundColor: '#9DBA9D',
   },
-  primaryButtonText: { color: COLORS.white, fontWeight: '600', fontSize: 16 },
-  answer: { color: COLORS.text, fontSize: 14, lineHeight: 22 },
-  answerMuted: { color: COLORS.lightText, fontSize: 14 },
-  disclaimer: { marginTop: 12, color: COLORS.lightText, fontSize: 12 },
+  primaryButtonText: { color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body, fontFamily: FONT_FAMILY },
+  answer: { color: colors.text, fontSize: TYPE.bodySmall, lineHeight: 22, fontFamily: FONT_FAMILY },
+  answerMuted: { color: colors.lightText, fontSize: TYPE.bodySmall, fontFamily: FONT_FAMILY },
+  disclaimer: { marginTop: 12, color: colors.lightText, fontSize: TYPE.caption, fontFamily: FONT_FAMILY },
   bgAccent: {
     position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: '#E7F2E7',
-    right: -80,
-    top: -60,
-    opacity: 0.6,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: colors.iconBg,
+    right: -85,
+    top: -65,
+    opacity: 0.72,
   },
 });
 

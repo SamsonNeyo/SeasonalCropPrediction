@@ -6,18 +6,22 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   Animated,
   Easing,
   Modal,
   Pressable,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../context/ThemeContext';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
 import { deleteHistoryItem, getUserHistory } from '../services/firestore';
 import { useAuth } from '../context/AuthContext';
 
 const HistoryScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +30,7 @@ const HistoryScreen = () => {
   const [monthOpen, setMonthOpen] = useState(false);
   const [filterYear, setFilterYear] = useState<number | 'all'>('all');
   const [filterMonth, setFilterMonth] = useState<number | 'all'>('all');
+  const [refreshing, setRefreshing] = useState(false);
   const headerIn = useRef(new Animated.Value(0)).current;
   const listIn = useRef(new Animated.Value(0)).current;
 
@@ -50,6 +55,15 @@ const HistoryScreen = () => {
   const handleDelete = async (id: string) => {
     await deleteHistoryItem(id);
     setItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await loadHistory();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -93,6 +107,15 @@ const HistoryScreen = () => {
     return Array.from(set).sort((a, b) => b - a);
   }, [items]);
 
+  useEffect(() => {
+    if (filterYear !== 'all') return;
+    if (years.length === 0) return;
+    const currentYear = new Date().getFullYear();
+    if (years.includes(currentYear)) {
+      setFilterYear(currentYear);
+    }
+  }, [years, filterYear]);
+
   const months = [
     { value: 1, label: 'January' },
     { value: 2, label: 'February' },
@@ -122,7 +145,11 @@ const HistoryScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
         <Animated.View
           style={[
             styles.header,
@@ -140,14 +167,14 @@ const HistoryScreen = () => {
           ]}
         >
           <View style={styles.headerIcon}>
-            <MaterialCommunityIcons name="history" size={24} color={COLORS.primary} />
+            <MaterialCommunityIcons name="history" size={24} color={colors.primary} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.title}>History</Text>
             <Text style={styles.subtitle}>Your recent predictions and manual analyses</Text>
           </View>
           <TouchableOpacity onPress={loadHistory} style={styles.refreshButton}>
-            <MaterialCommunityIcons name="refresh" size={18} color={COLORS.primary} />
+            <MaterialCommunityIcons name="refresh" size={18} color={colors.primary} />
           </TouchableOpacity>
         </Animated.View>
 
@@ -160,7 +187,7 @@ const HistoryScreen = () => {
                 <Text style={styles.filterValue}>
                   {filterYear === 'all' ? 'All' : String(filterYear)}
                 </Text>
-                <MaterialCommunityIcons name="chevron-down" size={18} color={COLORS.lightText} />
+                <MaterialCommunityIcons name="chevron-down" size={18} color={colors.lightText} />
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.filterField} onPress={() => setMonthOpen(true)}>
@@ -171,7 +198,7 @@ const HistoryScreen = () => {
                     ? 'All'
                     : months.find((m) => m.value === filterMonth)?.label || 'All'}
                 </Text>
-                <MaterialCommunityIcons name="chevron-down" size={18} color={COLORS.lightText} />
+                <MaterialCommunityIcons name="chevron-down" size={18} color={colors.lightText} />
               </View>
             </TouchableOpacity>
           </View>
@@ -205,17 +232,17 @@ const HistoryScreen = () => {
           ]}
         >
         {loading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         ) : !user ? (
           <View style={styles.emptyBox}>
-            <MaterialCommunityIcons name="account-alert-outline" size={26} color={COLORS.lightText} />
+            <MaterialCommunityIcons name="account-alert-outline" size={26} color={colors.lightText} />
             <Text style={styles.emptyText}>Please sign in to view your history.</Text>
           </View>
         ) : error ? (
           <Text style={styles.error}>{error}</Text>
         ) : filteredItems.length === 0 ? (
           <View style={styles.emptyBox}>
-            <MaterialCommunityIcons name="clipboard-text-outline" size={26} color={COLORS.lightText} />
+            <MaterialCommunityIcons name="clipboard-text-outline" size={26} color={colors.lightText} />
             <Text style={styles.emptyText}>
               {items.length === 0 ? 'No records yet. Your history will appear here.' : 'No records match your filter.'}
             </Text>
@@ -225,7 +252,7 @@ const HistoryScreen = () => {
             <View key={item.id} style={styles.card}>
                 <View style={styles.cardRow}>
                   <View style={styles.cardIcon}>
-                    <MaterialCommunityIcons name="sprout" size={18} color={COLORS.primary} />
+                    <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
                   </View>
                   <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>
@@ -236,7 +263,7 @@ const HistoryScreen = () => {
                   </Text>
                 </View>
                   <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
-                    <MaterialCommunityIcons name="trash-can-outline" size={18} color={COLORS.error} />
+                    <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.error} />
                   </TouchableOpacity>
                 </View>
 
@@ -271,6 +298,8 @@ const HistoryScreen = () => {
           setFilterYear(value as number | 'all');
           setYearOpen(false);
         }}
+        styles={styles}
+        colors={colors}
       />
       <SelectModal
         visible={monthOpen}
@@ -285,6 +314,8 @@ const HistoryScreen = () => {
           setFilterMonth(value as number | 'all');
           setMonthOpen(false);
         }}
+        styles={styles}
+        colors={colors}
       />
     </SafeAreaView>
   );
@@ -302,6 +333,8 @@ const SelectModal = ({
   options,
   value,
   onSelect,
+  styles,
+  colors,
 }: {
   visible: boolean;
   title: string;
@@ -309,6 +342,8 @@ const SelectModal = ({
   options: SelectOption[];
   value: number | 'all';
   onSelect: (value: number | 'all') => void;
+  styles: any;
+  colors: any;
 }) => {
   const slide = useRef(new Animated.Value(0)).current;
 
@@ -337,111 +372,114 @@ const SelectModal = ({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={20} color={COLORS.lightText} />
+              <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
             </TouchableOpacity>
           </View>
-          {options.map((opt) => {
-            const selected = opt.value === value;
-            return (
-              <TouchableOpacity
-                key={String(opt.value)}
-                style={[styles.modalOption, selected && styles.modalOptionActive]}
-                onPress={() => onSelect(opt.value)}
-              >
-                <Text style={[styles.modalLabel, selected && styles.modalLabelActive]}>{opt.label}</Text>
-                {selected && <MaterialCommunityIcons name="check" size={18} color={COLORS.primary} />}
-              </TouchableOpacity>
-            );
-          })}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalOptions}>
+            {options.map((opt) => {
+              const selected = opt.value === value;
+              return (
+                <TouchableOpacity
+                  key={String(opt.value)}
+                  style={[styles.modalOption, selected && styles.modalOptionActive]}
+                  onPress={() => onSelect(opt.value)}
+                >
+                  <Text style={[styles.modalLabel, selected && styles.modalLabelActive]}>{opt.label}</Text>
+                  {selected && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </Animated.View>
       </Pressable>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 24 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   headerIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#EAF4EA',
+    backgroundColor: colors.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   headerText: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: COLORS.primary },
-  subtitle: { fontSize: 14, color: COLORS.lightText, marginTop: 2 },
+  title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
+  subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, color: colors.lightText, marginTop: 2 },
   refreshButton: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  error: { color: COLORS.error, textAlign: 'center', marginTop: 12 },
+  error: { fontFamily: FONT_FAMILY, color: colors.error, textAlign: 'center', marginTop: 12, fontSize: TYPE.bodySmall },
   emptyBox: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
-  emptyText: { color: COLORS.lightText, marginTop: 8, textAlign: 'center' },
+  emptyText: { fontFamily: FONT_FAMILY, color: colors.lightText, marginTop: 8, textAlign: 'center', fontSize: TYPE.bodySmall },
   filterCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
-  filterTitle: { fontSize: 14, fontWeight: '700', color: COLORS.secondary, marginBottom: 8 },
+  filterTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 8 },
   filterRow: { flexDirection: 'row', gap: 10 },
   filterField: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#e6e6e6',
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 10,
-    backgroundColor: '#fbfbfb',
+    backgroundColor: colors.inputBg,
   },
-  filterLabel: { fontSize: 12, color: COLORS.lightText, marginBottom: 4 },
+  filterLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 4 },
   filterValueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  filterValue: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  filterValue: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.semibold, color: colors.text },
   clearButton: {
     marginTop: 10,
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F7ED',
+    backgroundColor: colors.pillBg,
     borderWidth: 1,
-    borderColor: '#D9E6D1',
+    borderColor: colors.pillBorder,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
   },
-  clearButtonText: { fontSize: 12, color: COLORS.secondary, fontWeight: '600' },
+  clearButtonText: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.secondary, fontWeight: WEIGHT.semibold },
   card: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
@@ -452,33 +490,33 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#EAF4EA',
+    backgroundColor: colors.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   cardText: { flex: 1 },
-  cardTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  cardSub: { fontSize: 12, color: COLORS.lightText, marginTop: 2 },
+  cardTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.text },
+  cardSub: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginTop: 2 },
   deleteBtn: { padding: 6 },
   recRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 6 },
   recChip: {
-    backgroundColor: '#F3F4F0',
+    backgroundColor: colors.chipBg,
     borderRadius: 12,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#e6e6e6',
+    borderColor: colors.chipBorder,
   },
-  recChipText: { fontSize: 11, color: COLORS.text },
-  timestampText: { marginTop: 8, color: COLORS.lightText, fontSize: 11 },
+  recChipText: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.text },
+  timestampText: { fontFamily: FONT_FAMILY, marginTop: 8, color: colors.lightText, fontSize: TYPE.tiny },
   listWrap: {},
   bgAccent: {
     position: 'absolute',
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: '#E7F2E7',
+    backgroundColor: colors.iconBg,
     right: -80,
     top: -60,
     opacity: 0.6,
@@ -489,11 +527,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
     maxHeight: 420,
+  },
+  modalOptions: {
+    paddingBottom: 6,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -501,7 +542,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: COLORS.secondary },
+  modalTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.h3, fontWeight: WEIGHT.bold, color: colors.secondary },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -509,13 +550,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ececec',
-    backgroundColor: '#fbfbfb',
+    borderColor: colors.border,
+    backgroundColor: colors.inputBg,
     marginBottom: 10,
   },
-  modalOptionActive: { borderColor: '#CFE4CF', backgroundColor: '#F1F7ED' },
-  modalLabel: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  modalLabelActive: { color: COLORS.primary },
+  modalOptionActive: { borderColor: colors.pillBorder, backgroundColor: colors.pillBg },
+  modalLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.text },
+  modalLabelActive: { color: colors.primary },
 });
 
 export default HistoryScreen;

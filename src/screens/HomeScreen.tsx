@@ -5,17 +5,22 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
-  SafeAreaView,
   Animated,
   Easing,
   TextInput,
+  TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { useAuth } from '../context/AuthContext';
 import { predictCrops, searchCrop } from '../services/api';
 import { savePrediction } from '../services/firestore';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../context/ThemeContext';
 import PredictionCard from '../components/PredictionCard';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 
 const getCurrentSeason = () => {
   const month = new Date().getMonth() + 1;
@@ -38,6 +43,8 @@ const formatTime = (d: Date) =>
   d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' });
 
 const HomeScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { userData } = useAuth();
   const [weather, setWeather] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -49,43 +56,56 @@ const HomeScreen = () => {
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [lastInputs, setLastInputs] = useState<any | null>(null);
   const [now, setNow] = useState(new Date());
+  const [refreshing, setRefreshing] = useState(false);
   const heroIn = useRef(new Animated.Value(0)).current;
   const listIn = useRef(new Animated.Value(0)).current;
 
   const fetchWeatherAndPredict = async () => {
+    const season = getCurrentSeason();
+    const defaultSoil = userData?.soilType || 'Loam';
     try {
       setError('');
+      let temperature = 26;
+      let rainMm = 0;
+      let locationName = 'Luwero District';
+      let condition = '';
+      let description = '';
+
       const apiKey = process.env.EXPO_PUBLIC_OWM_API_KEY;
-      if (!apiKey) {
-        throw new Error('Missing OpenWeatherMap API key.');
-      }
-      const lat = 0.8333;
-      const lon = 32.5;
-      const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        const msg = data?.message ? `OpenWeatherMap: ${data.message}` : 'OpenWeatherMap request failed.';
-        throw new Error(msg);
+      if (apiKey) {
+        const lat = 0.8333;
+        const lon = 32.5;
+        const res = await fetch(
+          `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          const msg = data?.message ? `OpenWeatherMap: ${data.message}` : 'OpenWeatherMap request failed.';
+          throw new Error(msg);
+        }
+
+        const firstItem = data?.list?.[0];
+        temperature = Number(firstItem?.main?.temp) || 26;
+        const next24h = Array.isArray(data?.list) ? data.list.slice(0, 8) : [];
+        rainMm = next24h.reduce((sum: number, item: any) => {
+          const r = Number(item?.rain?.['3h'] ?? 0);
+          return sum + (Number.isFinite(r) ? r : 0);
+        }, 0);
+        locationName = data?.city?.name || 'Luwero District';
+        condition = firstItem?.weather?.[0]?.main || '';
+        description = firstItem?.weather?.[0]?.description || '';
       }
 
-      const season = getCurrentSeason();
-      const defaultSoil = userData?.soilType || 'Loam';
-      const firstItem = data?.list?.[0];
-      const temperature = Number(firstItem?.main?.temp) || 26;
-      const next24h = Array.isArray(data?.list) ? data.list.slice(0, 8) : [];
-      const rainMm = next24h.reduce((sum: number, item: any) => {
-        const r = Number(item?.rain?.['3h'] ?? 0);
-        return sum + (Number.isFinite(r) ? r : 0);
-      }, 0);
-      const locationName = data?.city?.name || 'Luwero District';
       const rainfall = rainMm || (season === 'First' ? 180 : 120);
-      const condition = firstItem?.weather?.[0]?.main || '';
-      const description = firstItem?.weather?.[0]?.description || '';
-
       const inputs = { season, soil_type: defaultSoil, temperature, rainfall };
-      const result = await predictCrops(inputs);
+
+      let result: any;
+      try {
+        result = await predictCrops(inputs);
+      } catch (e: any) {
+        const msg = e?.message || 'Backend request failed.';
+        throw new Error(`Backend: ${msg}`);
+      }
 
       setRecommendations(result.recommendations);
       setLastInputs(inputs);
@@ -97,6 +117,24 @@ const HomeScreen = () => {
         description,
         updatedAt: new Date().toISOString(),
       });
+
+      // Local weather alert (only when app opens)
+      const alertsEnabled = (await AsyncStorage.getItem('smartcrop_weather_alerts')) === 'true';
+      if (alertsEnabled) {
+        const lastAlert = Number(await AsyncStorage.getItem('smartcrop_weather_alerts_last') || 0);
+        const nowTs = Date.now();
+        const shouldAlert = rainMm >= 15 || temperature >= 32;
+        if (shouldAlert && nowTs - lastAlert > 6 * 60 * 60 * 1000) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'Weather alert',
+              body: rainMm >= 15 ? 'Heavy rain expected. Consider drainage.' : 'High heat expected. Watch soil moisture.',
+            },
+            trigger: null,
+          });
+          await AsyncStorage.setItem('smartcrop_weather_alerts_last', String(nowTs));
+        }
+      }
 
       try {
         await savePrediction({
@@ -111,9 +149,7 @@ const HomeScreen = () => {
       }
     } catch (err: any) {
       const msg =
-        err?.message === 'Missing OpenWeatherMap API key.'
-          ? 'Missing OpenWeatherMap API key.'
-          : err?.message || 'Could not fetch live data.';
+        err?.message || 'Could not fetch live data.';
       setError(`${msg} Showing sample recommendations.`);
       const inputs = { season, soil_type: defaultSoil, temperature: 26, rainfall: 180 };
       setRecommendations([
@@ -123,6 +159,15 @@ const HomeScreen = () => {
       setLastInputs(inputs);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await fetchWeatherAndPredict();
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -187,7 +232,11 @@ const HomeScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
       <Animated.View
         style={[
           styles.hero,
@@ -216,7 +265,7 @@ const HomeScreen = () => {
             </Text>
           </View>
           <View style={styles.heroBadge}>
-            <Ionicons name="leaf-outline" size={18} color={COLORS.primary} />
+            <Ionicons name="leaf-outline" size={18} color={colors.primary} />
             <Text style={styles.badgeText}>{getCurrentSeason()} Season</Text>
           </View>
         </View>
@@ -224,28 +273,28 @@ const HomeScreen = () => {
         {weather && (
           <View style={styles.weatherCard}>
             <View style={styles.weatherItem}>
-              <Ionicons name="thermometer-outline" size={18} color={COLORS.secondary} />
+              <Ionicons name="thermometer-outline" size={18} color={colors.secondary} />
               <Text style={styles.weatherText}>{weather.temperature} C</Text>
             </View>
             <View style={styles.weatherDivider} />
             <View style={styles.weatherItem}>
-              <Ionicons name="rainy-outline" size={18} color={COLORS.secondary} />
+              <Ionicons name="rainy-outline" size={18} color={colors.secondary} />
               <Text style={styles.weatherText}>{Number(weather.rain || 0).toFixed(1)} mm</Text>
             </View>
             <View style={styles.weatherDivider} />
             <View style={styles.weatherItem}>
-              <Ionicons name="location-outline" size={18} color={COLORS.secondary} />
+              <Ionicons name="location-outline" size={18} color={colors.secondary} />
               <Text style={styles.weatherText}>{weather.location || 'Luwero'}</Text>
             </View>
           </View>
         )}
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={16} color={COLORS.secondary} />
+            <Ionicons name="calendar-outline" size={16} color={colors.secondary} />
             <Text style={styles.metaText}>{formatDate(now)}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={16} color={COLORS.secondary} />
+            <Ionicons name="time-outline" size={16} color={colors.secondary} />
             <Text style={styles.metaText}>
               {formatTime(now)}
             </Text>
@@ -273,21 +322,21 @@ const HomeScreen = () => {
           <Text style={styles.sectionTitle}>Smart Insights for Today</Text>
           <View style={styles.searchWrap}>
             <View style={styles.searchIcon}>
-              <Ionicons name="search" size={16} color={COLORS.secondary} />
+              <Ionicons name="search" size={16} color={colors.secondary} />
             </View>
             <TextInput
               style={styles.searchInput}
               placeholder="Search crop"
-              placeholderTextColor={COLORS.lightText}
+              placeholderTextColor={colors.lightText}
               value={search}
               onChangeText={setSearch}
               autoCorrect={false}
               underlineColorAndroid="transparent"
-              selectionColor={COLORS.primary}
+              selectionColor={colors.primary}
             />
             {!!search && (
               <TouchableOpacity style={styles.clearSearch} onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={18} color={COLORS.lightText} />
+                <Ionicons name="close-circle" size={18} color={colors.lightText} />
               </TouchableOpacity>
             )}
           </View>
@@ -296,7 +345,7 @@ const HomeScreen = () => {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         ) : (
           <>
             {!!error && <Text style={styles.error}>{error}</Text>}
@@ -317,113 +366,156 @@ const HomeScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: 16, paddingBottom: 24 },
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 16, paddingBottom: 32 },
   hero: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 18,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    marginBottom: 20,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
   heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  heroText: { flex: 1, paddingRight: 8 },
-  greeting: { fontSize: 24, fontWeight: '800', color: COLORS.primary },
-  heroSubtitle: { fontSize: 14, color: COLORS.lightText, marginTop: 6 },
+  heroText: { flex: 1, paddingRight: 10 },
+  greeting: {
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.h2,
+    fontWeight: WEIGHT.bold,
+    color: colors.primary,
+  },
+  heroSubtitle: {
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.bodySmall,
+    color: colors.lightText,
+    marginTop: 7,
+    lineHeight: 20,
+  },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EAF4EA',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    backgroundColor: colors.pillBg,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.pillBorder,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
   },
-  badgeText: { marginLeft: 6, color: COLORS.primary, fontWeight: '600', fontSize: 12 },
+  badgeText: {
+    marginLeft: 6,
+    color: colors.primary,
+    fontWeight: WEIGHT.semibold,
+    fontSize: TYPE.caption,
+    fontFamily: FONT_FAMILY,
+  },
   weatherCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8F8F3',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
   },
   weatherItem: { flexDirection: 'row', alignItems: 'center' },
-  weatherText: { marginLeft: 6, color: COLORS.text, fontWeight: '600', fontSize: 13 },
-  weatherDivider: { width: 1, height: 18, backgroundColor: '#e4e4e4' },
+  weatherText: {
+    marginLeft: 6,
+    color: colors.text,
+    fontWeight: WEIGHT.semibold,
+    fontSize: TYPE.caption,
+    fontFamily: FONT_FAMILY,
+  },
+  weatherDivider: { width: 1, height: 18, backgroundColor: colors.border },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
+    marginTop: 13,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F3',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
   },
-  metaText: { marginLeft: 6, color: COLORS.text, fontSize: 12, fontWeight: '600' },
+  metaText: {
+    marginLeft: 6,
+    color: colors.text,
+    fontSize: TYPE.caption,
+    fontWeight: WEIGHT.semibold,
+    fontFamily: FONT_FAMILY,
+  },
   sectionWrap: {},
-  sectionHeader: { marginVertical: 12, gap: 10 },
-  sectionTitle: { fontSize: 20, fontWeight: '700', color: COLORS.secondary },
+  sectionHeader: { marginBottom: 14, gap: 10 },
+  sectionTitle: {
+    fontSize: TYPE.h3,
+    fontWeight: WEIGHT.bold,
+    color: colors.secondary,
+    fontFamily: FONT_FAMILY,
+  },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E3E9E0',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
+    borderColor: colors.border,
+    borderRadius: 15,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    backgroundColor: colors.card,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
     elevation: 2,
   },
   searchIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#EAF4EA',
+    backgroundColor: colors.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchInput: {
     flex: 1,
-    marginLeft: 8,
-    color: COLORS.text,
+    marginLeft: 9,
+    color: colors.text,
     paddingVertical: 0,
-    fontSize: 14,
-    fontWeight: '600',
-    outlineStyle: 'none',
+    fontSize: TYPE.bodySmall,
+    fontWeight: WEIGHT.semibold,
+    fontFamily: FONT_FAMILY,
   },
   clearSearch: { paddingLeft: 6 },
-  searchStatus: { color: COLORS.lightText, fontSize: 12 },
-  searchError: { color: COLORS.error, fontSize: 12 },
-  error: { color: COLORS.error, textAlign: 'center', marginTop: 8, marginBottom: 8 },
-  empty: { color: COLORS.lightText, textAlign: 'center', marginTop: 12 },
+  searchStatus: { color: colors.lightText, fontSize: TYPE.caption, fontFamily: FONT_FAMILY },
+  searchError: { color: colors.error, fontSize: TYPE.caption, fontFamily: FONT_FAMILY },
+  error: { color: colors.error, textAlign: 'center', marginTop: 8, marginBottom: 8, fontFamily: FONT_FAMILY },
+  empty: { color: colors.lightText, textAlign: 'center', marginTop: 14, fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall },
   bgAccent: {
     position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: '#E7F2E7',
-    right: -90,
-    top: -80,
-    opacity: 0.6,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: colors.iconBg,
+    right: -85,
+    top: -95,
+    opacity: 0.75,
   },
 });
 

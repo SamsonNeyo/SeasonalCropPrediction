@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,19 +7,21 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   Animated,
   Easing,
   Platform,
   Modal,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../context/ThemeContext';
 import { predictCrops } from '../services/api';
 import { savePrediction } from '../services/firestore';
 
 const ManualAnalysisScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [season, setSeason] = useState<'First' | 'Second'>('First');
   const [soilType, setSoilType] = useState<'Loam' | 'Clay' | 'Sandy'>('Loam');
   const [temperature, setTemperature] = useState('26');
@@ -73,12 +75,12 @@ const ManualAnalysisScreen = () => {
   ];
 
   const handleAnalyze = async () => {
+    const tempValue = Number(temperature);
+    const rainValue = Number(rainfall);
     try {
       setError('');
       setSaved('');
       setResult(null);
-      const tempValue = Number(temperature);
-      const rainValue = Number(rainfall);
       if (!tempValue || !rainValue) {
         setError('Please enter valid temperature and rainfall values.');
         return;
@@ -152,7 +154,7 @@ const ManualAnalysisScreen = () => {
         ]}
       >
         <View style={styles.headerIcon}>
-          <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={COLORS.primary} />
+          <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={colors.primary} />
         </View>
         <View style={styles.headerText}>
           <Text style={styles.title}>Manual Analysis</Text>
@@ -182,7 +184,7 @@ const ManualAnalysisScreen = () => {
         <Text style={styles.label}>Season</Text>
         <TouchableOpacity style={styles.selectField} onPress={() => setSeasonOpen(true)}>
           <View style={styles.selectIcon}>
-            <MaterialCommunityIcons name="weather-cloudy" size={18} color={COLORS.secondary} />
+          <MaterialCommunityIcons name="weather-cloudy" size={18} color={colors.secondary} />
           </View>
           <View style={styles.selectText}>
             <Text style={styles.selectValue}>
@@ -192,13 +194,13 @@ const ManualAnalysisScreen = () => {
               {seasonOptions.find((o) => o.value === season)?.description || 'Select from the list'}
             </Text>
           </View>
-          <MaterialCommunityIcons name="chevron-down" size={20} color={COLORS.lightText} />
+          <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
         </TouchableOpacity>
 
         <Text style={styles.label}>Soil Type</Text>
         <TouchableOpacity style={styles.selectField} onPress={() => setSoilOpen(true)}>
           <View style={styles.selectIcon}>
-            <MaterialCommunityIcons name="shovel" size={18} color={COLORS.secondary} />
+          <MaterialCommunityIcons name="shovel" size={18} color={colors.secondary} />
           </View>
           <View style={styles.selectText}>
             <Text style={styles.selectValue}>
@@ -208,33 +210,33 @@ const ManualAnalysisScreen = () => {
               {soilOptions.find((o) => o.value === soilType)?.description || 'Select from the list'}
             </Text>
           </View>
-          <MaterialCommunityIcons name="chevron-down" size={20} color={COLORS.lightText} />
+          <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
         </TouchableOpacity>
 
         <Text style={styles.label}>Temperature</Text>
         <View style={styles.inputRow}>
-          <MaterialCommunityIcons name="thermometer" size={18} color={COLORS.secondary} />
+          <MaterialCommunityIcons name="thermometer" size={18} color={colors.secondary} />
           <TextInput
             style={styles.input}
             keyboardType="numeric"
             value={temperature}
             onChangeText={setTemperature}
             placeholder="26"
-            placeholderTextColor={COLORS.lightText}
+            placeholderTextColor={colors.lightText}
           />
           <Text style={styles.unit}>°C</Text>
         </View>
 
         <Text style={styles.label}>Rainfall</Text>
         <View style={styles.inputRow}>
-          <MaterialCommunityIcons name="weather-rainy" size={18} color={COLORS.secondary} />
+          <MaterialCommunityIcons name="weather-rainy" size={18} color={colors.secondary} />
           <TextInput
             style={styles.input}
             keyboardType="numeric"
             value={rainfall}
             onChangeText={setRainfall}
             placeholder="180"
-            placeholderTextColor={COLORS.lightText}
+            placeholderTextColor={colors.lightText}
           />
           <Text style={styles.unit}>mm</Text>
         </View>
@@ -243,10 +245,10 @@ const ManualAnalysisScreen = () => {
 
         <TouchableOpacity style={styles.primaryButton} onPress={handleAnalyze} disabled={loading}>
           {loading ? (
-            <ActivityIndicator color={COLORS.white} />
+            <ActivityIndicator color={colors.white} />
           ) : (
             <>
-              <MaterialCommunityIcons name="chart-box-outline" size={18} color={COLORS.white} />
+              <MaterialCommunityIcons name="chart-box-outline" size={18} color={colors.white} />
               <Text style={styles.primaryButtonText}>Analyze</Text>
             </>
           )}
@@ -279,7 +281,7 @@ const ManualAnalysisScreen = () => {
         {result?.map((r, i) => (
           <View key={i} style={styles.resultRow}>
             <View style={styles.resultIcon}>
-              <MaterialCommunityIcons name="sprout" size={18} color={COLORS.primary} />
+              <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
             </View>
             <View style={styles.resultText}>
               <Text style={styles.resultTitle}>{r.crop}</Text>
@@ -289,12 +291,14 @@ const ManualAnalysisScreen = () => {
         ))}
         {result && (
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <MaterialCommunityIcons name="content-save-outline" size={18} color={COLORS.white} />
+            <MaterialCommunityIcons name="content-save-outline" size={18} color={colors.white} />
             <Text style={styles.saveButtonText}>Save Analysis</Text>
           </TouchableOpacity>
         )}
       </Animated.View>
       <SelectModal
+        styles={styles}
+        colors={colors}
         visible={seasonOpen}
         title="Select season"
         onClose={() => setSeasonOpen(false)}
@@ -306,6 +310,8 @@ const ManualAnalysisScreen = () => {
         }}
       />
       <SelectModal
+        styles={styles}
+        colors={colors}
         visible={soilOpen}
         title="Select soil type"
         onClose={() => setSoilOpen(false)}
@@ -335,6 +341,8 @@ const SelectModal = ({
   options,
   value,
   onSelect,
+  styles,
+  colors,
 }: {
   visible: boolean;
   title: string;
@@ -342,6 +350,8 @@ const SelectModal = ({
   options: SelectOption[];
   value: string;
   onSelect: (value: string) => void;
+  styles: any;
+  colors: any;
 }) => {
   const slide = useRef(new Animated.Value(0)).current;
 
@@ -370,7 +380,7 @@ const SelectModal = ({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={20} color={COLORS.lightText} />
+              <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
             </TouchableOpacity>
           </View>
           {options.map((opt) => {
@@ -385,14 +395,14 @@ const SelectModal = ({
                   <MaterialCommunityIcons
                     name={(opt.icon as any) || 'circle-outline'}
                     size={18}
-                    color={selected ? COLORS.primary : COLORS.secondary}
+                    color={selected ? colors.primary : colors.secondary}
                   />
                 </View>
                 <View style={styles.modalText}>
                   <Text style={[styles.modalLabel, selected && styles.modalLabelActive]}>{opt.label}</Text>
                   {!!opt.description && <Text style={styles.modalDesc}>{opt.description}</Text>}
                 </View>
-                {selected && <MaterialCommunityIcons name="check" size={18} color={COLORS.primary} />}
+                {selected && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
               </TouchableOpacity>
             );
           })}
@@ -402,8 +412,9 @@ const SelectModal = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 24 },
   header: {
     flexDirection: 'row',
@@ -420,64 +431,64 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   headerText: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: COLORS.primary, letterSpacing: 0.2 },
-  subtitle: { fontSize: 14, color: COLORS.lightText, marginTop: 2 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.primary, letterSpacing: 0.2 },
+  subtitle: { fontSize: 14, color: colors.lightText, marginTop: 2 },
   card: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: COLORS.secondary, marginBottom: 6 },
-  sectionHint: { fontSize: 12, color: COLORS.lightText, marginBottom: 12 },
-  label: { fontSize: 13, fontWeight: '700', color: COLORS.secondary, marginBottom: 6 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.secondary, marginBottom: 6 },
+  sectionHint: { fontSize: 12, color: colors.lightText, marginBottom: 12 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.secondary, marginBottom: 6 },
   selectField: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e1e1e1',
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 12,
-    backgroundColor: '#fbfbfb',
+    backgroundColor: colors.inputBg,
     marginBottom: 12,
   },
   selectIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#EAF4EA',
+    backgroundColor: colors.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   selectText: { flex: 1 },
-  selectValue: { color: COLORS.text, fontWeight: '700', fontSize: 14 },
-  selectHint: { color: COLORS.lightText, fontSize: 12, marginTop: 2 },
+  selectValue: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  selectHint: { color: colors.lightText, fontSize: 12, marginTop: 2 },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e1e1e1',
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 10,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.inputBg,
     marginBottom: 12,
   },
   input: {
     flex: 1,
     paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     paddingHorizontal: 10,
-    color: COLORS.text,
+    color: colors.text,
   },
-  unit: { color: COLORS.lightText, fontWeight: '600', marginLeft: 6 },
-  saved: { color: COLORS.secondary, marginBottom: 10 },
+  unit: { color: colors.lightText, fontWeight: '600', marginLeft: 6 },
+  saved: { color: colors.secondary, marginBottom: 10 },
   primaryButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -485,10 +496,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  primaryButtonText: { color: COLORS.white, fontWeight: '600', fontSize: 16 },
+  primaryButtonText: { color: colors.white, fontWeight: '600', fontSize: 16 },
   saveButton: {
     marginTop: 12,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: colors.secondary,
     paddingVertical: 10,
     borderRadius: 12,
     alignItems: 'center',
@@ -496,37 +507,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  saveButtonText: { color: COLORS.white, fontWeight: '600', fontSize: 14 },
-  empty: { color: COLORS.lightText, fontSize: 14 },
+  saveButtonText: { color: colors.white, fontWeight: '600', fontSize: 14 },
+  empty: { color: colors.lightText, fontSize: 14 },
   resultRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   resultIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#EAF4EA',
+    backgroundColor: colors.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   resultText: { flex: 1 },
-  resultTitle: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
-  resultSubtitle: { color: COLORS.lightText, fontSize: 12, marginTop: 2 },
+  resultTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  resultSubtitle: { color: colors.lightText, fontSize: 12, marginTop: 2 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sectionPill: {
-    backgroundColor: '#F1F7ED',
+    backgroundColor: colors.pillBg,
     borderWidth: 1,
-    borderColor: '#D9E6D1',
+    borderColor: colors.pillBorder,
     borderRadius: 999,
     paddingVertical: 4,
     paddingHorizontal: 10,
   },
-  sectionPillText: { fontSize: 11, color: COLORS.secondary, fontWeight: '600' },
+  sectionPillText: { fontSize: 11, color: colors.secondary, fontWeight: '600' },
   bgAccent: {
     position: 'absolute',
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: '#E7F2E7',
+    backgroundColor: colors.iconBg,
     right: -80,
     top: -60,
     opacity: 0.6,
@@ -537,7 +548,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
@@ -549,31 +560,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: COLORS.secondary },
+  modalTitle: { fontSize: 16, fontWeight: '800', color: colors.secondary },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ececec',
-    backgroundColor: '#fbfbfb',
+    borderColor: colors.border,
+    backgroundColor: colors.inputBg,
     marginBottom: 10,
   },
-  modalOptionActive: { borderColor: '#CFE4CF', backgroundColor: '#F1F7ED' },
+  modalOptionActive: { borderColor: colors.pillBorder, backgroundColor: colors.pillBg },
   modalIcon: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#EAF4EA',
+    backgroundColor: colors.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   modalText: { flex: 1 },
-  modalLabel: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  modalLabelActive: { color: COLORS.primary },
-  modalDesc: { fontSize: 12, color: COLORS.lightText, marginTop: 2 },
+  modalLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
+  modalLabelActive: { color: colors.primary },
+  modalDesc: { fontSize: 12, color: colors.lightText, marginTop: 2 },
 });
 
 export default ManualAnalysisScreen;
