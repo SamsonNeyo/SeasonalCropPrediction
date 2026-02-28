@@ -8,7 +8,12 @@ import {
   sendEmailVerification,
   reload,
   User,
+  GoogleAuthProvider,
+  signInWithCredential,
 } from 'firebase/auth';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { FirebaseError } from 'firebase/app';
 import { auth, db } from '../config/firebase';
@@ -19,6 +24,7 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserData: (data: Record<string, any>) => Promise<void>;
@@ -27,6 +33,7 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+WebBrowser.maybeCompleteAuthSession();
 
 const getAuthErrorMessage = (error: unknown) => {
   if (error instanceof FirebaseError) {
@@ -67,6 +74,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const fallbackClientId = 'placeholder.apps.googleusercontent.com';
+  const redirectUri = makeRedirectUri({
+    useProxy: true,
+    projectNameForProxy: '@neyo1/crop-prediction-app',
+  });
+  const [, , promptAsync] = Google.useIdTokenAuthRequest({
+    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || fallbackClientId,
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || fallbackClientId,
+    redirectUri,
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -96,7 +115,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const normalizedEmail = email.trim().toLowerCase();
       const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
       await sendEmailVerification(cred.user);
-      await setDoc(doc(db, 'users', cred.user.uid), { name, soilType: 'Loam' });
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        name,
+        region: 'Luwero',
+        subCounty: '',
+        soilType: '',
+        profileComplete: false,
+      });
+    } catch (e) {
+      throw new Error(getAuthErrorMessage(e));
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      const hasClientId =
+        !!process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID ||
+        !!process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+        !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+        !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+      if (!hasClientId) {
+        throw new Error('Google Sign-In is not configured. Add Google client IDs in .env.');
+      }
+
+      const result = await promptAsync({ useProxy: true });
+      if (result.type !== 'success') {
+        throw new Error('Google sign-in cancelled.');
+      }
+
+      const idToken = result.authentication?.idToken;
+      if (!idToken) {
+        throw new Error('Google did not return an ID token.');
+      }
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      const docRef = doc(db, 'users', userCredential.user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || 'Farmer',
+          email: userCredential.user.email || '',
+          region: 'Luwero',
+          subCounty: '',
+          soilType: '',
+          profileComplete: false,
+        });
+      }
     } catch (e) {
       throw new Error(getAuthErrorMessage(e));
     }
@@ -148,6 +214,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loading,
         login,
         signup,
+        loginWithGoogle,
         logout,
         resetPassword,
         updateUserData,

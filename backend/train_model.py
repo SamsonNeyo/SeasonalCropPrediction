@@ -1,67 +1,83 @@
+from pathlib import Path
+
+import joblib
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-import joblib
-from datetime import datetime
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 
-# Generate realistic synthetic data for Luwero crops
-np.random.seed(42)
-n = 1200
+DATA_PATH = Path(__file__).resolve().parent / "data" / "crop_dataset.csv"
+MODEL_PATH = Path(__file__).resolve().parent / "model_pipeline.joblib"
 
-seasons = np.random.choice(['First', 'Second'], n)
-soils = np.random.choice(['Loam', 'Clay', 'Sandy'], n)
-temps = np.random.normal(26.5, 4.5, n).clip(18, 35)
-rainfalls = np.random.normal(170, 85, n).clip(50, 420)
 
-crops = []
-for s, soil, t, r in zip(seasons, soils, temps, rainfalls):
-    if s == 'First' and 150 < r < 280 and 22 < t < 30 and soil in ['Loam', 'Clay']:
-        crops.append('Maize')
-    elif s == 'First' and soil == 'Sandy' and r > 180:
-        crops.append('Cassava')
-    elif r < 120 and soil == 'Sandy':
-        crops.append('Sweet Potatoes')
-    elif 20 < t < 28 and soil == 'Loam':
-        crops.append('Beans')
-    elif soil == 'Loam' and r > 100:
-        crops.append('Bananas')
-    elif t > 24 and r < 150:
-        crops.append('Coffee')
-    elif soil == 'Sandy' and 22 < t < 32:
-        crops.append('Pineapple')
-    elif r > 120 and soil in ['Loam', 'Clay']:
-        crops.append('Groundnuts')
-    else:
-        crops.append(np.random.choice(['Maize', 'Beans', 'Cassava', 'Bananas']))
+def _synthetic_dataset() -> pd.DataFrame:
+    np.random.seed(42)
+    n = 1500
+    seasons = np.random.choice(["First", "Second"], n)
+    soils = np.random.choice(["Loam", "Clay Loam", "Sandy Loam"], n)
+    temps = np.random.normal(26.5, 4.5, n).clip(18, 35)
+    rainfalls = np.random.normal(170, 85, n).clip(50, 420)
+    crops = []
+    for season, soil, temp, rain in zip(seasons, soils, temps, rainfalls):
+        if season == "First" and 150 < rain < 280 and 22 < temp < 30 and soil in {"Loam", "Clay Loam"}:
+            crops.append("Maize")
+        elif season == "First" and soil == "Sandy Loam" and rain > 180:
+            crops.append("Cassava")
+        elif 20 < temp < 28 and soil == "Loam":
+            crops.append("Beans")
+        elif rain > 120 and soil in {"Loam", "Clay Loam"}:
+            crops.append("Groundnuts")
+        elif rain > 220 and temp > 24:
+            crops.append("Rice")
+        else:
+            crops.append(np.random.choice(["Maize", "Beans", "Cassava", "Groundnuts", "Banana", "Rice"]))
+    return pd.DataFrame(
+        {
+            "season": seasons,
+            "soil_type": soils,
+            "temperature": temps,
+            "rainfall": rainfalls,
+            "crop": crops,
+        }
+    )
 
-df = pd.DataFrame({
-    'season': seasons,
-    'soil_type': soils,
-    'temperature': temps,
-    'rainfall': rainfalls,
-    'crop': crops
-})
 
-X = df[['season', 'soil_type', 'temperature', 'rainfall']]
-y = df['crop']
+def _load_dataset() -> pd.DataFrame:
+    if DATA_PATH.exists():
+        return pd.read_csv(DATA_PATH)
+    return _synthetic_dataset()
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('cat', OneHotEncoder(handle_unknown='ignore'), ['season', 'soil_type']),
-        ('num', StandardScaler(), ['temperature', 'rainfall'])
-    ])
 
-model = Pipeline([
-    ('preprocessor', preprocessor),
-    ('classifier', RandomForestClassifier(n_estimators=200, random_state=42, max_depth=15))
-])
+def main() -> None:
+    df = _load_dataset().dropna().copy()
+    season_encoder = LabelEncoder()
+    soil_encoder = LabelEncoder()
+    crop_encoder = LabelEncoder()
+    df["season_encoded"] = season_encoder.fit_transform(df["season"])
+    df["soil_type_encoded"] = soil_encoder.fit_transform(df["soil_type"])
+    df["crop_encoded"] = crop_encoder.fit_transform(df["crop"])
+    X = df[["season_encoded", "soil_type_encoded", "temperature", "rainfall"]]
+    y = df["crop_encoded"]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+    accuracy = accuracy_score(y_test, preds)
+    cm = confusion_matrix(y_test, preds)
+    artifact = {
+        "model": model,
+        "encoders": {"season": season_encoder, "soil_type": soil_encoder, "crop": crop_encoder},
+        "feature_columns": ["season_encoded", "soil_type_encoded", "temperature", "rainfall"],
+    }
+    joblib.dump(artifact, MODEL_PATH)
+    print(f"Model saved to {MODEL_PATH}")
+    print(f"Accuracy: {accuracy:.4f}")
+    print("Confusion matrix:")
+    print(cm)
+    print("Target accuracy >= 85% achieved." if accuracy >= 0.85 else "Target accuracy >= 85% not reached.")
 
-model.fit(X, y)
 
-joblib.dump(model, 'model_pipeline.joblib')
-print("Model trained and saved!")
-print("Classes:", model.classes_)
+if __name__ == "__main__":
+    main()

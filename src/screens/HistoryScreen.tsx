@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   Animated,
@@ -27,9 +28,9 @@ const HistoryScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [yearOpen, setYearOpen] = useState(false);
-  const [monthOpen, setMonthOpen] = useState(false);
+  const [seasonOpen, setSeasonOpen] = useState(false);
   const [filterYear, setFilterYear] = useState<number | 'all'>('all');
-  const [filterMonth, setFilterMonth] = useState<number | 'all'>('all');
+  const [filterSeason, setFilterSeason] = useState<'all' | 'First' | 'Second'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const headerIn = useRef(new Animated.Value(0)).current;
   const listIn = useRef(new Animated.Value(0)).current;
@@ -117,30 +118,27 @@ const HistoryScreen = () => {
   }, [years, filterYear]);
 
   const months = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' },
+    { value: 'First' as const, label: 'First Season' },
+    { value: 'Second' as const, label: 'Second Season' },
   ];
+
+  const normalizeSeason = (value: any): 'First' | 'Second' | null => {
+    const raw = String(value || '').trim().toLowerCase();
+    if (raw === '1' || raw.includes('first')) return 'First';
+    if (raw === '2' || raw.includes('second')) return 'Second';
+    return null;
+  };
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      if (filterYear === 'all' && filterMonth === 'all') return true;
+      if (filterYear === 'all' && filterSeason === 'all') return true;
       const d = getItemDate(item);
       if (!d) return false;
       if (filterYear !== 'all' && d.getFullYear() !== filterYear) return false;
-      if (filterMonth !== 'all' && d.getMonth() + 1 !== filterMonth) return false;
+      if (filterSeason !== 'all' && normalizeSeason(item?.season) !== filterSeason) return false;
       return true;
     });
-  }, [items, filterYear, filterMonth]);
+  }, [items, filterSeason, filterYear]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -190,24 +188,24 @@ const HistoryScreen = () => {
                 <MaterialCommunityIcons name="chevron-down" size={18} color={colors.lightText} />
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.filterField} onPress={() => setMonthOpen(true)}>
-              <Text style={styles.filterLabel}>Month</Text>
+            <TouchableOpacity style={styles.filterField} onPress={() => setSeasonOpen(true)}>
+              <Text style={styles.filterLabel}>Season</Text>
               <View style={styles.filterValueRow}>
                 <Text style={styles.filterValue}>
-                  {filterMonth === 'all'
+                  {filterSeason === 'all'
                     ? 'All'
-                    : months.find((m) => m.value === filterMonth)?.label || 'All'}
+                    : months.find((m) => m.value === filterSeason)?.label || 'All'}
                 </Text>
                 <MaterialCommunityIcons name="chevron-down" size={18} color={colors.lightText} />
               </View>
             </TouchableOpacity>
           </View>
-          {(filterYear !== 'all' || filterMonth !== 'all') && (
+          {(filterYear !== 'all' || filterSeason !== 'all') && (
             <TouchableOpacity
               style={styles.clearButton}
               onPress={() => {
                 setFilterYear('all');
-                setFilterMonth('all');
+                setFilterSeason('all');
               }}
             >
               <Text style={styles.clearButtonText}>Clear filters</Text>
@@ -256,10 +254,10 @@ const HistoryScreen = () => {
                   </View>
                   <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>
-                    {item.season || 'Season'} - {item.soil_type || 'Soil'}
+                    {item.sub_county || 'Luwero'} - {normalizeSeason(item.season) || 'Season'}
                   </Text>
                   <Text style={styles.cardSub}>
-                    {item.temperature} C - {item.rainfall} mm
+                    {item.soil_type || 'Mapped soil'} - {item.temperature ?? '-'} C - {item.rainfall ?? '-'} mm
                   </Text>
                 </View>
                   <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
@@ -302,17 +300,17 @@ const HistoryScreen = () => {
         colors={colors}
       />
       <SelectModal
-        visible={monthOpen}
-        title="Select month"
-        onClose={() => setMonthOpen(false)}
+        visible={seasonOpen}
+        title="Select season"
+        onClose={() => setSeasonOpen(false)}
         options={[
-          { label: 'All months', value: 'all' },
+          { label: 'All seasons', value: 'all' },
           ...months.map((m) => ({ label: m.label, value: m.value })),
         ]}
-        value={filterMonth}
+        value={filterSeason}
         onSelect={(value) => {
-          setFilterMonth(value as number | 'all');
-          setMonthOpen(false);
+          setFilterSeason(value as 'all' | 'First' | 'Second');
+          setSeasonOpen(false);
         }}
         styles={styles}
         colors={colors}
@@ -323,7 +321,7 @@ const HistoryScreen = () => {
 
 type SelectOption = {
   label: string;
-  value: number | 'all';
+  value: number | 'all' | 'First' | 'Second';
 };
 
 const SelectModal = ({
@@ -340,8 +338,8 @@ const SelectModal = ({
   title: string;
   onClose: () => void;
   options: SelectOption[];
-  value: number | 'all';
-  onSelect: (value: number | 'all') => void;
+  value: number | 'all' | 'First' | 'Second';
+  onSelect: (value: number | 'all' | 'First' | 'Second') => void;
   styles: any;
   colors: any;
 }) => {
@@ -367,7 +365,8 @@ const SelectModal = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <Animated.View style={[styles.modalCard, { transform: [{ translateY }] }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
@@ -375,8 +374,15 @@ const SelectModal = ({
               <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
             </TouchableOpacity>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalOptions}>
-            {options.map((opt) => {
+          <FlatList
+            data={options}
+            keyExtractor={(opt) => String(opt.value)}
+            style={styles.modalList}
+            contentContainerStyle={styles.modalOptions}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item: opt }) => {
               const selected = opt.value === value;
               return (
                 <TouchableOpacity
@@ -388,10 +394,11 @@ const SelectModal = ({
                   {selected && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
                 </TouchableOpacity>
               );
-            })}
-          </ScrollView>
+            }}
+            ListEmptyComponent={<Text style={styles.modalEmpty}>No options available.</Text>}
+          />
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 };
@@ -428,8 +435,10 @@ const createStyles = (colors: any) =>
   },
   error: { fontFamily: FONT_FAMILY, color: colors.error, textAlign: 'center', marginTop: 12, fontSize: TYPE.bodySmall },
   emptyBox: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
     padding: 20,
     alignItems: 'center',
     shadowColor: colors.shadow,
@@ -440,8 +449,10 @@ const createStyles = (colors: any) =>
   },
   emptyText: { fontFamily: FONT_FAMILY, color: colors.lightText, marginTop: 8, textAlign: 'center', fontSize: TYPE.bodySmall },
   filterCard: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
     padding: 14,
     marginBottom: 12,
     shadowColor: colors.shadow,
@@ -455,10 +466,10 @@ const createStyles = (colors: any) =>
   filterField: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
     borderRadius: 12,
     padding: 10,
-    backgroundColor: colors.inputBg,
+    backgroundColor: colors.glassSoft,
   },
   filterLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 4 },
   filterValueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -475,8 +486,10 @@ const createStyles = (colors: any) =>
   },
   clearButtonText: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.secondary, fontWeight: WEIGHT.semibold },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
     padding: 14,
     marginBottom: 12,
     shadowColor: colors.shadow,
@@ -501,12 +514,12 @@ const createStyles = (colors: any) =>
   deleteBtn: { padding: 6 },
   recRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 6 },
   recChip: {
-    backgroundColor: colors.chipBg,
+    backgroundColor: colors.glassSoft,
     borderRadius: 12,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: colors.chipBorder,
+    borderColor: colors.glassBorder,
   },
   recChipText: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.text },
   timestampText: { fontFamily: FONT_FAMILY, marginTop: 8, color: colors.lightText, fontSize: TYPE.tiny },
@@ -526,12 +539,20 @@ const createStyles = (colors: any) =>
     backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
   },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   modalCard: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
     maxHeight: 420,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  modalList: {
+    maxHeight: 330,
   },
   modalOptions: {
     paddingBottom: 6,
@@ -550,13 +571,20 @@ const createStyles = (colors: any) =>
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.inputBg,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glassSoft,
     marginBottom: 10,
   },
   modalOptionActive: { borderColor: colors.pillBorder, backgroundColor: colors.pillBg },
   modalLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.text },
   modalLabelActive: { color: colors.primary },
+  modalEmpty: {
+    fontFamily: FONT_FAMILY,
+    color: colors.lightText,
+    textAlign: 'center',
+    paddingVertical: 12,
+    fontSize: TYPE.bodySmall,
+  },
 });
 
 export default HistoryScreen;

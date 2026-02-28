@@ -11,8 +11,10 @@ import {
   Platform,
   Animated,
   Easing,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 const SignupScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { signup } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -77,6 +79,19 @@ const SignupScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleGoogleSignup = async () => {
+    try {
+      setError('');
+      setLoading(true);
+      await loginWithGoogle();
+    } catch (e: any) {
+      if (String(e?.message || '').toLowerCase().includes('cancel')) return;
+      setError(e?.message || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const disableSignup =
     loading || !name.trim() || !email.trim() || !password || !confirmPassword || !acceptTerms;
 
@@ -84,100 +99,126 @@ const SignupScreen = ({ navigation }: any) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.bgOrbOne} />
       <View style={styles.bgOrbTwo} />
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: headerIn,
-            transform: [
-              {
-                translateY: headerIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [14, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join SmartCrop to get personalized crop insights</Text>
-      </Animated.View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Animated.View
+          style={[
+            styles.header,
+            {
+              opacity: headerIn,
+              transform: [
+                {
+                  translateY: headerIn.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [14, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
+          <View style={styles.pill}>
+            <Text style={styles.pillText}>Get Started in Minutes</Text>
+          </View>
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>Set up your profile to receive crop guidance for your area.</Text>
+        </Animated.View>
 
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity: cardIn,
-            transform: [
-              {
-                translateY: cardIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [18, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="Full name"
-          placeholderTextColor={colors.lightText}
-          value={name}
-          onChangeText={setName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.lightText}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <View style={styles.passwordRow}>
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              opacity: cardIn,
+              transform: [
+                {
+                  translateY: cardIn.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.sectionIntro}>
+            <MaterialCommunityIcons name="sprout-outline" size={16} color={colors.secondary} />
+            <Text style={styles.sectionIntroText}>Your default region is set to Luwero</Text>
+          </View>
           <TextInput
-            style={[styles.input, styles.passwordInput]}
-            placeholder="Password"
+            style={styles.input}
+            placeholder="Full name"
+            placeholderTextColor={colors.lightText}
+            value={name}
+            onChangeText={setName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor={colors.lightText}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              placeholder="Password"
+              placeholderTextColor={colors.lightText}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+            />
+            <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
+              <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm password"
             placeholderTextColor={colors.lightText}
             secureTextEntry={!showPassword}
-            value={password}
-            onChangeText={setPassword}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
           />
-          <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
-            <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
+
+          <Pressable style={styles.checkboxRow} onPress={() => setAcceptTerms(!acceptTerms)}>
+            <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]} />
+            <Text style={styles.checkboxText}>I agree to the Terms & Privacy Policy</Text>
+          </Pressable>
+
+          {!!error && <Text style={styles.error}>{error}</Text>}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, disableSignup && styles.primaryButtonDisabled]}
+            onPress={handleSignup}
+            disabled={disableSignup}
+          >
+            {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Create Account</Text>}
           </TouchableOpacity>
-        </View>
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm password"
-          placeholderTextColor={colors.lightText}
-          secureTextEntry={!showPassword}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
+          <Pressable
+            style={({ hovered, pressed }) => [
+              styles.googleButton,
+              hovered && styles.googleButtonHover,
+              pressed && styles.googleButtonPressed,
+              loading && styles.googleButtonDisabled,
+            ]}
+            android_ripple={{ color: '#E8EAED' }}
+            onPress={handleGoogleSignup}
+            disabled={loading}
+          >
+            <View style={styles.googleIconWrap}>
+              <MaterialCommunityIcons name="google" size={18} color="#4285F4" />
+            </View>
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </Pressable>
 
-        <Pressable style={styles.checkboxRow} onPress={() => setAcceptTerms(!acceptTerms)}>
-          <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]} />
-          <Text style={styles.checkboxText}>I agree to the Terms & Privacy Policy</Text>
-        </Pressable>
-
-        {!!error && <Text style={styles.error}>{error}</Text>}
-
-        <TouchableOpacity
-          style={[styles.primaryButton, disableSignup && styles.primaryButtonDisabled]}
-          onPress={handleSignup}
-          disabled={disableSignup}
-        >
-          {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Sign up</Text>}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.link}>Already have an account? Login</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <Text style={styles.link}>Already have an account? Sign In</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerNote}>You can update sub-county and preferences later in Profile.</Text>
+        </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -185,10 +226,13 @@ const SignupScreen = ({ navigation }: any) => {
 const createStyles = (colors: any) =>
   StyleSheet.create({
     container: {
-      flexGrow: 1,
+      flex: 1,
       backgroundColor: colors.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
       paddingHorizontal: 24,
-      paddingVertical: 16,
+      paddingVertical: 20,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -201,31 +245,65 @@ const createStyles = (colors: any) =>
       height: 96,
       marginBottom: 10,
     },
+    pill: {
+      alignSelf: 'center',
+      backgroundColor: colors.pillBg,
+      borderWidth: 1,
+      borderColor: colors.pillBorder,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+      marginBottom: 8,
+    },
+    pillText: {
+      fontFamily: FONT_FAMILY,
+      color: colors.secondary,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+    },
     title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
     subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 6, textAlign: 'center' },
     card: {
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 420 : undefined,
-      backgroundColor: colors.card,
+      backgroundColor: colors.glass,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.glassBorder,
       padding: 18,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.09,
-      shadowRadius: 16,
+      shadowOpacity: 0.14,
+      shadowRadius: 18,
       shadowOffset: { width: 0, height: 8 },
       elevation: 3,
       alignSelf: 'center',
     },
+    sectionIntro: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+      backgroundColor: colors.glassSoft,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+    },
+    sectionIntroText: {
+      marginLeft: 7,
+      fontFamily: FONT_FAMILY,
+      color: colors.secondary,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+    },
     input: {
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.glassBorder,
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 11,
       marginBottom: 11,
-      backgroundColor: colors.inputBg,
+      backgroundColor: colors.glassSoft,
       color: colors.text,
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.body,
@@ -282,6 +360,55 @@ const createStyles = (colors: any) =>
     primaryButtonDisabled: { backgroundColor: '#9DBA9D' },
     primaryButtonText: { fontFamily: FONT_FAMILY, color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body },
     link: { fontFamily: FONT_FAMILY, color: colors.secondary, marginTop: 12, textAlign: 'center', fontSize: TYPE.bodySmall },
+    googleButton: {
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: '#DADCE0',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      minHeight: 48,
+      paddingVertical: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
+    },
+    googleButtonHover: {
+      backgroundColor: '#F8FAFD',
+      borderColor: '#C6DAFC',
+    },
+    googleButtonPressed: {
+      backgroundColor: '#F1F3F4',
+    },
+    googleButtonDisabled: {
+      opacity: 0.65,
+    },
+    googleIconWrap: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+    },
+    googleButtonText: {
+      fontFamily: FONT_FAMILY,
+      color: '#1F1F1F',
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.semibold,
+      letterSpacing: 0.2,
+    },
+    footerNote: {
+      fontFamily: FONT_FAMILY,
+      color: colors.lightText,
+      marginTop: 10,
+      textAlign: 'center',
+      fontSize: TYPE.tiny,
+    },
     brand: {
       fontFamily: FONT_FAMILY,
       marginTop: 10,

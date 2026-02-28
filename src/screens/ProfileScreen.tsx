@@ -11,6 +11,8 @@ import {
   Animated,
   Easing,
   Switch,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,16 +22,22 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
 import { useAuth } from '../context/AuthContext';
+import { getSoilZones } from '../services/api';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }: any) => {
   const { colors, isDark, setDarkMode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, userData, logout, updateUserData } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingZones, setLoadingZones] = useState(true);
+  const [subCountyOpen, setSubCountyOpen] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [name, setName] = useState(userData?.name || user?.email?.split('@')[0] || 'Farmer');
-  const [soilType, setSoilType] = useState<'Loam' | 'Clay' | 'Sandy'>(userData?.soilType || 'Loam');
+  const [zones, setZones] = useState<Array<{ sub_county: string; soil_type: string }>>([]);
+  const [subCounty, setSubCounty] = useState(userData?.subCounty || 'Bamunanika');
+  const [soilType, setSoilType] = useState(userData?.soilType || 'Clay Loam');
   const [region, setRegion] = useState(userData?.region || 'Luwero');
   const [photoBase64, setPhotoBase64] = useState<string | null>(userData?.photoBase64 || null);
   const [photoUri, setPhotoUri] = useState<string | null>(userData?.photoUri || null);
@@ -37,8 +45,19 @@ const ProfileScreen = () => {
   const [weatherAlerts, setWeatherAlerts] = useState(true);
   const headerIn = useRef(new Animated.Value(0)).current;
   const cardIn = useRef(new Animated.Value(0)).current;
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const displayName = useMemo(() => name || user?.email?.split('@')[0] || 'Farmer', [name, user?.email]);
+
+  useEffect(() => {
+    if (!userData) return;
+    setName(userData?.name || user?.email?.split('@')[0] || 'Farmer');
+    setSubCounty(userData?.subCounty || 'Bamunanika');
+    setSoilType(userData?.soilType || 'Clay Loam');
+    setRegion(userData?.region || 'Luwero');
+    setPhotoBase64(userData?.photoBase64 || null);
+    setPhotoUri(userData?.photoUri || null);
+  }, [userData, user?.email]);
 
   useEffect(() => {
     Animated.stagger(140, [
@@ -58,6 +77,28 @@ const ProfileScreen = () => {
   }, [headerIn, cardIn]);
 
   useEffect(() => {
+    const loadZones = async () => {
+      try {
+        setLoadingZones(true);
+        const payload = await getSoilZones();
+        const list = payload?.soil_zones || [];
+        setZones(list);
+        if (list.length > 0) {
+          const existing = list.find((z: any) => z.sub_county === subCounty);
+          const selected = existing || list[0];
+          setSubCounty(selected.sub_county);
+          setSoilType(selected.soil_type);
+        }
+      } catch {
+        // Keep current values on failure.
+      } finally {
+        setLoadingZones(false);
+      }
+    };
+    loadZones();
+  }, []);
+
+  useEffect(() => {
     const loadPrefs = async () => {
       try {
         const dm = await AsyncStorage.getItem('smartcrop_dark_mode');
@@ -72,6 +113,26 @@ const ProfileScreen = () => {
     };
     loadPrefs();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSelectSubCounty = (value: string) => {
+    setSubCounty(value);
+    const mapped = zones.find((z) => z.sub_county === value);
+    if (mapped) {
+      setSoilType(mapped.soil_type);
+    }
+  };
 
 
   const handlePickImage = async () => {
@@ -96,17 +157,22 @@ const ProfileScreen = () => {
   const handleSave = async () => {
     try {
       setError('');
+      setToast(null);
       setSaving(true);
       await updateUserData({
         name: name.trim() || 'Farmer',
+        subCounty,
         soilType,
         region: region.trim() || 'Luwero',
         photoBase64: photoBase64 || null,
         photoUri: photoUri || null,
       });
       setEditMode(false);
+      showToast('Profile saved successfully.');
     } catch (e: any) {
-      setError(e?.message || 'Could not save profile');
+      const msg = e?.message || 'Could not save profile';
+      setError(msg);
+      showToast(msg, 'error');
     } finally {
       setSaving(false);
     }
@@ -115,6 +181,7 @@ const ProfileScreen = () => {
   const savePref = async (key: string, value: boolean) => {
     try {
       await AsyncStorage.setItem(key, String(value));
+      showToast('Settings saved successfully.');
     } catch {
       // Ignore preference save errors.
     }
@@ -218,19 +285,29 @@ const ProfileScreen = () => {
           />
         </View>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Soil Type</Text>
-          <View style={styles.toggleRow}>
-            {(['Loam', 'Clay', 'Sandy'] as const).map((s) => (
-              <TouchableOpacity
-                key={s}
-                style={[styles.toggle, soilType === s && styles.toggleActive, !editMode && styles.toggleDisabled]}
-                onPress={() => editMode && setSoilType(s)}
-                disabled={!editMode}
-              >
-                <Text style={[styles.toggleText, soilType === s && styles.toggleTextActive]}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.fieldLabel}>Sub-county</Text>
+          {loadingZones ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <TouchableOpacity
+              style={[styles.input, styles.selectField, !editMode && styles.inputDisabled]}
+              onPress={() => editMode && setSubCountyOpen(true)}
+              disabled={!editMode}
+            >
+              <Text style={styles.selectValue}>{subCounty || 'Select sub-county'}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Mapped Soil Type</Text>
+          <TextInput
+            style={[styles.input, styles.inputDisabled]}
+            editable={false}
+            value={soilType}
+            placeholder="Mapped automatically"
+            placeholderTextColor={colors.lightText}
+          />
         </View>
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Region</Text>
@@ -279,8 +356,8 @@ const ProfileScreen = () => {
             <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.secondary} />
           </View>
           <View style={styles.infoBody}>
-            <Text style={styles.rowText}>Preferred region</Text>
-            <Text style={styles.mutedSmall}>{region || 'Luwero'}</Text>
+            <Text style={styles.rowText}>Sub-county</Text>
+            <Text style={styles.mutedSmall}>{subCounty || 'Not set'}</Text>
           </View>
         </View>
 
@@ -290,7 +367,7 @@ const ProfileScreen = () => {
           </View>
           <View style={styles.infoBody}>
             <Text style={styles.rowText}>Soil profile</Text>
-            <Text style={styles.mutedSmall}>{soilType} soil selected</Text>
+            <Text style={styles.mutedSmall}>{soilType} (mapped from sub-county)</Text>
           </View>
         </View>
       </Animated.View>
@@ -373,6 +450,20 @@ const ProfileScreen = () => {
             thumbColor={weatherAlerts ? colors.primary : '#f4f4f4'}
           />
         </View>
+
+        <View style={styles.manualBlock}>
+          <View style={styles.manualHeader}>
+            <MaterialCommunityIcons name="map-search-outline" size={18} color={colors.secondary} />
+            <Text style={styles.manualTitle}>Manual Analysis</Text>
+          </View>
+          <Text style={styles.mutedSmall}>
+            Run manual analysis anytime for your preferred Luwero sub-county.
+          </Text>
+          <TouchableOpacity style={styles.manualButton} onPress={() => navigation.navigate('ManualAnalysis')}>
+            <MaterialCommunityIcons name="arrow-right-circle-outline" size={17} color={colors.white} />
+            <Text style={styles.manualButtonText}>Open Manual Analysis</Text>
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       {!!error && <Text style={styles.error}>{error}</Text>}
@@ -397,6 +488,49 @@ const ProfileScreen = () => {
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
       </ScrollView>
+      <Modal visible={subCountyOpen} transparent animationType="fade" onRequestClose={() => setSubCountyOpen(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setSubCountyOpen(false)}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Sub-county</Text>
+              <TouchableOpacity onPress={() => setSubCountyOpen(false)}>
+                <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {zones.map((z) => {
+                const active = subCounty === z.sub_county;
+                return (
+                  <TouchableOpacity
+                    key={z.sub_county}
+                    style={[styles.modalOption, active && styles.modalOptionActive]}
+                    onPress={() => {
+                      handleSelectSubCounty(z.sub_county);
+                      setSubCountyOpen(false);
+                    }}
+                  >
+                    <View style={styles.modalOptionText}>
+                      <Text style={[styles.modalOptionTitle, active && styles.modalOptionTitleActive]}>{z.sub_county}</Text>
+                      <Text style={styles.modalOptionHint}>Mapped soil: {z.soil_type}</Text>
+                    </View>
+                    {active && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+      {!!toast && (
+        <View style={[styles.toast, toast.type === 'error' ? styles.toastError : styles.toastSuccess]}>
+          <MaterialCommunityIcons
+            name={toast.type === 'error' ? 'alert-circle-outline' : 'check-circle-outline'}
+            size={16}
+            color={colors.white}
+          />
+          <Text style={styles.toastText}>{toast.message}</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -407,8 +541,10 @@ const createStyles = (colors: any) =>
   content: { padding: 16, paddingBottom: 24 },
   header: {
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
     padding: 16,
     marginBottom: 16,
     shadowColor: colors.shadow,
@@ -443,8 +579,10 @@ const createStyles = (colors: any) =>
   email: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 4 },
   tapHint: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.lightText, marginTop: 6 },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
     padding: 16,
     marginBottom: 14,
     shadowColor: colors.shadow,
@@ -487,14 +625,50 @@ const createStyles = (colors: any) =>
     borderBottomColor: colors.border,
   },
   settingText: { flex: 1, paddingRight: 12 },
+  manualBlock: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 12,
+    backgroundColor: colors.glassSoft,
+    padding: 10,
+  },
+  manualHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  manualTitle: {
+    marginLeft: 7,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.bodySmall,
+    color: colors.secondary,
+    fontWeight: WEIGHT.semibold,
+  },
+  manualButton: {
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: colors.secondary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    gap: 6,
+  },
+  manualButtonText: {
+    fontFamily: FONT_FAMILY,
+    color: colors.white,
+    fontSize: TYPE.caption,
+    fontWeight: WEIGHT.semibold,
+  },
   field: { marginBottom: 12 },
   fieldLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
     borderRadius: 10,
     padding: 12,
-    backgroundColor: colors.inputBg,
+    backgroundColor: colors.glassSoft,
     color: colors.text,
     fontFamily: FONT_FAMILY,
     fontSize: TYPE.body,
@@ -502,6 +676,16 @@ const createStyles = (colors: any) =>
   inputDisabled: {
     backgroundColor: colors.surfaceAlt,
     color: colors.lightText,
+  },
+  selectField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectValue: {
+    fontFamily: FONT_FAMILY,
+    color: colors.text,
+    fontSize: TYPE.body,
   },
   toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   toggle: {
@@ -558,6 +742,77 @@ const createStyles = (colors: any) =>
     right: -80,
     top: -60,
     opacity: 0.6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: colors.glass,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    maxHeight: 500,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  modalTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.bold, color: colors.secondary },
+  modalOption: {
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    backgroundColor: colors.glassSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.iconBg,
+  },
+  modalOptionText: { flex: 1 },
+  modalOptionTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.text, fontWeight: WEIGHT.semibold },
+  modalOptionTitleActive: { color: colors.primary },
+  modalOptionHint: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginTop: 2 },
+  toast: {
+    position: 'absolute',
+    top: 14,
+    left: 16,
+    right: 16,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 30,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  toastSuccess: {
+    backgroundColor: colors.primary,
+  },
+  toastError: {
+    backgroundColor: colors.error,
+  },
+  toastText: {
+    marginLeft: 8,
+    color: colors.white,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.caption,
+    fontWeight: WEIGHT.semibold,
+    flex: 1,
   },
 });
 

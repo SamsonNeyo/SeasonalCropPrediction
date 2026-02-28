@@ -11,8 +11,10 @@ import {
   Platform,
   Animated,
   Easing,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 const LoginScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { login, resetPassword } = useAuth();
+  const { login, loginWithGoogle, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -86,101 +88,141 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setError('');
+      setInfo('');
+      setLoading(true);
+      await loginWithGoogle();
+    } catch (e: any) {
+      if (String(e?.message || '').toLowerCase().includes('cancel')) return;
+      setError(e?.message || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const disableLogin = loading || !email.trim() || !password;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgOrbOne} />
       <View style={styles.bgOrbTwo} />
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: headerIn,
-            transform: [
-              {
-                translateY: headerIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [14, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to continue to your dashboard</Text>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity: cardIn,
-            transform: [
-              {
-                translateY: cardIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [18, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.lightText}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <View style={styles.passwordRow}>
-          <TextInput
-            style={[styles.input, styles.passwordInput]}
-            placeholder="Password"
-            placeholderTextColor={colors.lightText}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            textContentType="password"
-            autoComplete="password"
-            value={password}
-            onChangeText={setPassword}
-          />
-          <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
-            <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.rowBetween}>
-          <Pressable style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)}>
-            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]} />
-            <Text style={styles.checkboxText}>Remember me</Text>
-          </Pressable>
-          <TouchableOpacity onPress={handleResetPassword}>
-            <Text style={styles.linkInline}>Forgot password?</Text>
-          </TouchableOpacity>
-        </View>
-
-        {!!error && <Text style={styles.error}>{error}</Text>}
-        {!!info && <Text style={styles.info}>{info}</Text>}
-
-        <TouchableOpacity
-          style={[styles.primaryButton, disableLogin && styles.primaryButtonDisabled]}
-          onPress={handleLogin}
-          disabled={disableLogin}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Animated.View
+          style={[
+            styles.header,
+            {
+              opacity: headerIn,
+              transform: [
+                {
+                  translateY: headerIn.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [14, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Login</Text>}
-        </TouchableOpacity>
+          <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
+          <View style={styles.pill}>
+            <Text style={styles.pillText}>Luwero Farming Assistant</Text>
+          </View>
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Sign in to view seasonal recommendations and farm history.</Text>
+        </Animated.View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-          <Text style={styles.link}>No account? Create one</Text>
-        </TouchableOpacity>
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              opacity: cardIn,
+              transform: [
+                {
+                  translateY: cardIn.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.sectionIntro}>
+            <MaterialCommunityIcons name="account-check-outline" size={16} color={colors.secondary} />
+            <Text style={styles.sectionIntroText}>Use your SmartCrop account details</Text>
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor={colors.lightText}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              placeholder="Password"
+              placeholderTextColor={colors.lightText}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
+              autoComplete="password"
+              value={password}
+              onChangeText={setPassword}
+            />
+            <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
+              <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.rowBetween}>
+            <Pressable style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)}>
+              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]} />
+              <Text style={styles.checkboxText}>Remember me</Text>
+            </Pressable>
+            <TouchableOpacity onPress={handleResetPassword}>
+              <Text style={styles.linkInline}>Forgot password?</Text>
+            </TouchableOpacity>
+          </View>
+
+          {!!error && <Text style={styles.error}>{error}</Text>}
+          {!!info && <Text style={styles.info}>{info}</Text>}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, disableLogin && styles.primaryButtonDisabled]}
+            onPress={handleLogin}
+            disabled={disableLogin}
+          >
+            {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Sign In</Text>}
+          </TouchableOpacity>
+          <Pressable
+            style={({ hovered, pressed }) => [
+              styles.googleButton,
+              hovered && styles.googleButtonHover,
+              pressed && styles.googleButtonPressed,
+              loading && styles.googleButtonDisabled,
+            ]}
+            android_ripple={{ color: '#E8EAED' }}
+            onPress={handleGoogleLogin}
+            disabled={loading}
+          >
+            <View style={styles.googleIconWrap}>
+              <MaterialCommunityIcons name="google" size={18} color="#4285F4" />
+            </View>
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </Pressable>
+
+          <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+            <Text style={styles.link}>New here? Create an account</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerNote}>Secure sign-in for your crop planning profile.</Text>
+        </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -190,7 +232,11 @@ const createStyles = (colors: any) =>
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
       padding: 24,
+      paddingVertical: 20,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -206,29 +252,63 @@ const createStyles = (colors: any) =>
     brandName: { fontFamily: FONT_FAMILY, fontSize: TYPE.h3, fontWeight: WEIGHT.bold, color: colors.primary, marginBottom: 6 },
     title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
     subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 6, textAlign: 'center' },
+    pill: {
+      alignSelf: 'center',
+      backgroundColor: colors.pillBg,
+      borderWidth: 1,
+      borderColor: colors.pillBorder,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+      marginBottom: 8,
+    },
+    pillText: {
+      fontFamily: FONT_FAMILY,
+      color: colors.secondary,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+    },
     card: {
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 420 : undefined,
-      backgroundColor: colors.card,
+      backgroundColor: colors.glass,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.glassBorder,
       padding: 18,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.09,
-      shadowRadius: 16,
+      shadowOpacity: 0.14,
+      shadowRadius: 18,
       shadowOffset: { width: 0, height: 8 },
       elevation: 3,
       alignSelf: 'center',
     },
+    sectionIntro: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+      backgroundColor: colors.glassSoft,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+    },
+    sectionIntroText: {
+      marginLeft: 7,
+      fontFamily: FONT_FAMILY,
+      color: colors.secondary,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+    },
     input: {
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.glassBorder,
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 11,
       marginBottom: 11,
-      backgroundColor: colors.inputBg,
+      backgroundColor: colors.glassSoft,
       color: colors.text,
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.body,
@@ -291,6 +371,55 @@ const createStyles = (colors: any) =>
     primaryButtonDisabled: { backgroundColor: '#9DBA9D' },
     primaryButtonText: { fontFamily: FONT_FAMILY, color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body },
     link: { fontFamily: FONT_FAMILY, color: colors.secondary, marginTop: 12, textAlign: 'center', fontSize: TYPE.bodySmall },
+    googleButton: {
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: '#DADCE0',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      minHeight: 48,
+      paddingVertical: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
+    },
+    googleButtonHover: {
+      backgroundColor: '#F8FAFD',
+      borderColor: '#C6DAFC',
+    },
+    googleButtonPressed: {
+      backgroundColor: '#F1F3F4',
+    },
+    googleButtonDisabled: {
+      opacity: 0.65,
+    },
+    googleIconWrap: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+    },
+    googleButtonText: {
+      fontFamily: FONT_FAMILY,
+      color: '#1F1F1F',
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.semibold,
+      letterSpacing: 0.2,
+    },
+    footerNote: {
+      fontFamily: FONT_FAMILY,
+      color: colors.lightText,
+      marginTop: 10,
+      textAlign: 'center',
+      fontSize: TYPE.tiny,
+    },
     linkInline: { fontFamily: FONT_FAMILY, color: colors.secondary, fontSize: TYPE.caption },
     brand: {
       fontFamily: FONT_FAMILY,

@@ -45,7 +45,7 @@ export const api = axios.create({
 });
 
 export const predictCrops = async (data: {
-  season: string;
+  season: string | number;
   soil_type: string;
   temperature: number;
   rainfall: number;
@@ -59,5 +59,25 @@ export const searchCrop = async (
   crop: string
 ) => {
   const res = await api.post(`/predict/search?crop=${encodeURIComponent(crop)}`, data);
+  return res.data;
+};
+
+export const detectSoilType = async (data: { latitude: number; longitude: number }) => {
+  const res = await api.post('/detect-soil', data);
+  return res.data;
+};
+
+export const getForecast = async (steps = 6) => {
+  const res = await api.get(`/forecast?steps=${steps}`);
+  return res.data;
+};
+
+export const getSoilZones = async () => {
+  const res = await api.get('/soil-zones');
+  return res.data;
+};
+
+export const predictBySubCounty = async (data: { sub_county: string; season?: string | number }) => {
+  const res = await api.post('/predict/sub-county', data);
   return res.data;
 };

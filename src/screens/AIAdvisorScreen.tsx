@@ -15,17 +15,19 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getAIAdvice } from '../services/openai';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
+import { useAuth } from '../context/AuthContext';
 
-const QUICK_PROMPTS = [
-  'Best crops for first season in Luwero',
-  'How to improve loam soil before planting',
-  'Signs of nitrogen deficiency in maize',
-  'How to reduce pest damage naturally',
-];
+const getCurrentSeason = () => {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 6) return 'First';
+  if (month >= 8 && month <= 12) return 'Second';
+  return 'First';
+};
 
 const AIAdvisorScreen = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { userData } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,10 +51,25 @@ const AIAdvisorScreen = () => {
     ]).start();
   }, [headerIn, cardIn]);
 
+  const season = getCurrentSeason();
+  const subCounty = userData?.subCounty || 'Bamunanika';
+  const soilType = userData?.soilType || 'Clay Loam';
+  const QUICK_PROMPTS = [
+    `Best crops for the ${season.toLowerCase()} season in ${subCounty}, Luwero District.`,
+    `Give a weekly farm plan for ${subCounty} in ${season} Season (${soilType} soil).`,
+    `Top pests to watch in ${subCounty} during ${season} Season and control steps.`,
+    `When should farmers in ${subCounty} prepare for harvest and selling in ${season} Season?`,
+  ];
+
   const handleAsk = async () => {
+    if (!prompt.trim()) return;
     setLoading(true);
     setAnswer('');
-    const reply = await getAIAdvice(prompt);
+    const reply = await getAIAdvice(prompt, {
+      subCounty,
+      soilType,
+      season: `${season} Season`,
+    });
     setAnswer(reply);
     setLoading(false);
   };
@@ -82,7 +99,7 @@ const AIAdvisorScreen = () => {
           </View>
           <View style={styles.headerText}>
             <Text style={styles.title}>AI Advisor</Text>
-            <Text style={styles.subtitle}>Get quick, practical farming guidance</Text>
+            <Text style={styles.subtitle}>Map-aware guidance for your sub-county and season</Text>
           </View>
         </Animated.View>
 
@@ -102,6 +119,20 @@ const AIAdvisorScreen = () => {
             },
           ]}
         >
+          <View style={styles.contextCard}>
+            <View style={styles.contextPill}>
+              <MaterialCommunityIcons name="map-marker-radius-outline" size={14} color={colors.secondary} />
+              <Text style={styles.contextText}>{subCounty}</Text>
+            </View>
+            <View style={styles.contextPill}>
+              <MaterialCommunityIcons name="layers-outline" size={14} color={colors.secondary} />
+              <Text style={styles.contextText}>{soilType}</Text>
+            </View>
+            <View style={styles.contextPill}>
+              <MaterialCommunityIcons name="leaf-circle-outline" size={14} color={colors.secondary} />
+              <Text style={styles.contextText}>{season} Season</Text>
+            </View>
+          </View>
           <Text style={styles.label}>Ask a question</Text>
           <TextInput
             style={styles.input}
@@ -192,27 +223,27 @@ const createStyles = (colors: any) =>
   title: { fontFamily: FONT_FAMILY, fontSize: TYPE.h2, fontWeight: WEIGHT.bold, color: colors.primary, letterSpacing: 0.2 },
   subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 2 },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
     padding: 16,
     marginBottom: 14,
     shadowColor: colors.shadow,
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 2,
+    elevation: 3,
   },
   label: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 8 },
   input: {
     minHeight: 90,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
     borderRadius: 13,
     padding: 12,
     marginBottom: 14,
-    backgroundColor: colors.inputBg,
+    backgroundColor: colors.glassSoft,
     color: colors.text,
     fontFamily: FONT_FAMILY,
     fontSize: TYPE.body,
@@ -220,16 +251,39 @@ const createStyles = (colors: any) =>
   },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: {
-    backgroundColor: colors.chipBg,
+    backgroundColor: colors.glassSoft,
     borderRadius: 16,
     paddingVertical: 6,
     paddingHorizontal: 10,
     marginRight: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: colors.chipBorder,
+    borderColor: colors.glassBorder,
   },
   chipText: { fontSize: TYPE.caption, color: colors.text, fontFamily: FONT_FAMILY },
+  contextCard: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  contextPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  contextText: {
+    marginLeft: 5,
+    color: colors.secondary,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.caption,
+    fontWeight: WEIGHT.semibold,
+  },
   primaryButton: {
     backgroundColor: colors.primary,
     paddingVertical: 12,

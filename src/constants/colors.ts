@@ -18,6 +18,10 @@ export type ThemeColors = {
   pillBg: string;
   pillBorder: string;
   shadow: string;
+  glass: string;
+  glassSoft: string;
+  glassBorder: string;
+  glassHighlight: string;
 };
 
 export const LIGHT_COLORS: ThemeColors = {
@@ -40,6 +44,10 @@ export const LIGHT_COLORS: ThemeColors = {
   pillBg: '#ECF5E7',
   pillBorder: '#CBDFC4',
   shadow: '#0E1E14',
+  glass: '#FFFFFF',
+  glassSoft: '#F7F9F4',
+  glassBorder: '#D6DED2',
+  glassHighlight: '#FFFFFF',
 };
 
 export const DARK_COLORS: ThemeColors = {
@@ -62,4 +70,8 @@ export const DARK_COLORS: ThemeColors = {
   pillBg: '#1D2E25',
   pillBorder: '#31423A',
   shadow: '#000000',
+  glass: '#17201A',
+  glassSoft: '#1D2620',
+  glassBorder: '#2A3A31',
+  glassHighlight: 'rgba(255,255,255,0.08)',
 };

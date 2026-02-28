@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -9,6 +9,8 @@ const PredictionCard = ({ prediction }: { prediction: any }) => {
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (!prediction) return null;
   const { crop, confidence, explanation } = prediction;
+  const planning = prediction?.planning;
+  const actionList: string[] = Array.isArray(planning?.planning_actions) ? planning.planning_actions : [];
 
   return (
     <View style={styles.card}>
@@ -24,6 +26,24 @@ const PredictionCard = ({ prediction }: { prediction: any }) => {
         </View>
       </View>
       {!!explanation && <Text style={styles.explanation}>{explanation}</Text>}
+      {!!planning && (
+        <View style={styles.planWrap}>
+          <View style={styles.planRow}>
+            <MaterialCommunityIcons name="calendar-clock-outline" size={15} color={colors.secondary} />
+            <Text style={styles.planText}>Harvest window: {planning.harvest_window}</Text>
+          </View>
+          <View style={styles.planRow}>
+            <MaterialCommunityIcons name="timer-sand" size={15} color={colors.secondary} />
+            <Text style={styles.planText}>Growth period: {planning.duration_days} days</Text>
+          </View>
+          {actionList.slice(0, 2).map((action, idx) => (
+            <View key={`${crop}-action-${idx}`} style={styles.planRow}>
+              <MaterialCommunityIcons name="check-circle-outline" size={15} color={colors.secondary} />
+              <Text style={styles.planText}>{action}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 };
@@ -31,17 +51,17 @@ const PredictionCard = ({ prediction }: { prediction: any }) => {
 const createStyles = (colors: any) =>
   StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.glass,
     borderRadius: 16,
     padding: 15,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
     marginBottom: 12,
     shadowColor: colors.shadow,
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
   icon: {
@@ -73,6 +93,25 @@ const createStyles = (colors: any) =>
     color: colors.text,
     lineHeight: 20,
   },
+  planWrap: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
+    gap: 6,
+  },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  planText: {
+    marginLeft: 6,
+    flex: 1,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.caption,
+    color: colors.text,
+    lineHeight: 18,
+  },
 });
 
-export default PredictionCard;
+export default memo(PredictionCard);

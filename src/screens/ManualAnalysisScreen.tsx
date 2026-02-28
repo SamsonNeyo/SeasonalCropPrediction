@@ -1,590 +1,503 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Animated,
-  Easing,
-  Platform,
-  Modal,
-  Pressable,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { predictCrops } from '../services/api';
+import { getSoilZones, predictBySubCounty } from '../services/api';
 import { savePrediction } from '../services/firestore';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 
-const ManualAnalysisScreen = () => {
+type Zone = { sub_county: string; soil_type: string };
+
+const ManualAnalysisScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [season, setSeason] = useState<'First' | 'Second'>('First');
-  const [soilType, setSoilType] = useState<'Loam' | 'Clay' | 'Sandy'>('Loam');
-  const [temperature, setTemperature] = useState('26');
-  const [rainfall, setRainfall] = useState('180');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any[] | null>(null);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+  const [loadingZones, setLoadingZones] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [subCountyOpen, setSubCountyOpen] = useState(false);
   const [error, setError] = useState('');
-  const [saved, setSaved] = useState('');
-  const [analysisInputs, setAnalysisInputs] = useState<any | null>(null);
-  const headerIn = useRef(new Animated.Value(0)).current;
-  const cardIn = useRef(new Animated.Value(0)).current;
-  const [seasonOpen, setSeasonOpen] = useState(false);
-  const [soilOpen, setSoilOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [analysisInputs, setAnalysisInputs] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<any[] | null>(null);
+  const sortedZones = useMemo(() => [...zones].sort((a, b) => a.sub_county.localeCompare(b.sub_county)), [zones]);
+  const saveMessageTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    Animated.stagger(140, [
-      Animated.timing(headerIn, {
-        toValue: 1,
-        duration: 600,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(cardIn, {
-        toValue: 1,
-        duration: 600,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [headerIn, cardIn]);
+    const loadZones = async () => {
+      try {
+        setLoadingZones(true);
+        const payload = await getSoilZones();
+        const list = payload?.soil_zones || [];
+        setZones(list);
+        if (list.length > 0) setSelectedZone(list[0]);
+      } catch {
+        setError('Could not load sub-county list.');
+      } finally {
+        setLoadingZones(false);
+      }
+    };
+    loadZones();
+  }, []);
 
-  const seasonOptions = [
-    {
-      label: 'First season',
-      value: 'First',
-      description: 'March to June (main rains)',
-      icon: 'weather-cloudy',
-    },
-    {
-      label: 'Second season',
-      value: 'Second',
-      description: 'August to December (short rains)',
-      icon: 'weather-partly-cloudy',
-    },
-  ];
+  useEffect(() => {
+    return () => {
+      if (saveMessageTimer.current) clearTimeout(saveMessageTimer.current);
+    };
+  }, []);
 
-  const soilOptions = [
-    { label: 'Loam', value: 'Loam', description: 'Balanced, moisture-retaining', icon: 'shovel' },
-    { label: 'Clay', value: 'Clay', description: 'Holds water, slow drainage', icon: 'water' },
-    { label: 'Sandy', value: 'Sandy', description: 'Fast drainage, airy', icon: 'grain' },
-  ];
+  const showSaveMessage = useCallback((message: string, type: 'success' | 'error') => {
+    if (saveMessageTimer.current) clearTimeout(saveMessageTimer.current);
+    setToast({ message, type });
+    saveMessageTimer.current = setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  }, []);
 
-  const handleAnalyze = async () => {
-    const tempValue = Number(temperature);
-    const rainValue = Number(rainfall);
+  const runAnalysis = useCallback(async () => {
+    if (!selectedZone) {
+      setError('Select a sub-county first.');
+      return;
+    }
     try {
       setError('');
-      setSaved('');
-      setResult(null);
-      if (!tempValue || !rainValue) {
-        setError('Please enter valid temperature and rainfall values.');
-        return;
-      }
-      setLoading(true);
-      const res = await predictCrops({
-        season,
-        soil_type: soilType,
-        temperature: tempValue,
-        rainfall: rainValue,
-      });
-      setResult(res.recommendations || []);
-      setAnalysisInputs({
-        season,
-        soil_type: soilType,
-        temperature: tempValue,
-        rainfall: rainValue,
-      });
-    } catch (e: any) {
-      const offlineRecs = [
-        { crop: 'Maize', confidence: 82 },
-        { crop: 'Beans', confidence: 70 },
-        { crop: 'Cassava', confidence: 65 },
-      ];
-      setError('Could not reach the backend. Showing offline recommendations.');
-      setResult(offlineRecs);
-      setAnalysisInputs({
-        season,
-        soil_type: soilType,
-        temperature: tempValue,
-        rainfall: rainValue,
-      });
+      setToast(null);
+      setAnalyzing(true);
+      const response = await predictBySubCounty({ sub_county: selectedZone.sub_county });
+      setAnalysisInputs(response.inputs);
+      setRecommendations(response.recommendations || []);
+    } catch {
+      setError('Prediction failed. Please try again.');
     } finally {
-      setLoading(false);
+      setAnalyzing(false);
     }
-  };
+  }, [selectedZone]);
 
-  const handleSave = async () => {
-    if (!analysisInputs || !result) return;
+  const saveToHistory = useCallback(async () => {
+    if (!analysisInputs || !recommendations) return;
     try {
-      setSaved('');
-      await savePrediction({
-        ...analysisInputs,
-        recommendations: result,
-      });
-      setSaved('Saved to history.');
+      setSaving(true);
+      setToast(null);
+      await savePrediction({ ...analysisInputs, recommendations });
+      const message = 'Analysis saved to history.';
+      showSaveMessage(message, 'success');
     } catch (e: any) {
-      const msg = e?.code || e?.message || 'Sign in to save to history.';
-      setSaved(`Save failed: ${msg}`);
+      const msg = e?.code || e?.message || 'Sign in to save history.';
+      const message = `Save failed: ${msg}`;
+      showSaveMessage(message, 'error');
+    } finally {
+      setSaving(false);
     }
-  };
+  }, [analysisInputs, recommendations, showSaveMessage]);
+
+  const renderZone = useCallback(
+    ({ item: zone }: { item: Zone }) => {
+      const active = selectedZone?.sub_county === zone.sub_county;
+      return (
+        <TouchableOpacity
+          style={[styles.modalOption, active && styles.modalOptionActive]}
+          onPress={() => {
+            setSelectedZone(zone);
+            setSubCountyOpen(false);
+          }}
+        >
+          <View style={styles.zoneTextWrap}>
+            <Text style={[styles.zoneName, active && styles.zoneNameActive]}>{zone.sub_county}</Text>
+            <Text style={styles.zoneSoil}>Mapped soil: {zone.soil_type}</Text>
+          </View>
+          {active && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
+        </TouchableOpacity>
+      );
+    },
+    [colors.primary, selectedZone?.sub_county, styles]
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.bgAccent} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: headerIn,
-            transform: [
-              {
-                translateY: headerIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [12, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.headerIcon}>
-          <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={colors.primary} />
-        </View>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Manual Analysis</Text>
-          <Text style={styles.subtitle}>Enter your farm conditions for tailored crop suggestions</Text>
-        </View>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity: cardIn,
-            transform: [
-              {
-                translateY: cardIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [16, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <Text style={styles.sectionTitle}>Farm Inputs</Text>
-        <Text style={styles.sectionHint}>Choose your season and soil, then add recent conditions.</Text>
-
-        <Text style={styles.label}>Season</Text>
-        <TouchableOpacity style={styles.selectField} onPress={() => setSeasonOpen(true)}>
-          <View style={styles.selectIcon}>
-          <MaterialCommunityIcons name="weather-cloudy" size={18} color={colors.secondary} />
-          </View>
-          <View style={styles.selectText}>
-            <Text style={styles.selectValue}>
-              {seasonOptions.find((o) => o.value === season)?.label || 'Choose season'}
-            </Text>
-            <Text style={styles.selectHint}>
-              {seasonOptions.find((o) => o.value === season)?.description || 'Select from the list'}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
-        </TouchableOpacity>
-
-        <Text style={styles.label}>Soil Type</Text>
-        <TouchableOpacity style={styles.selectField} onPress={() => setSoilOpen(true)}>
-          <View style={styles.selectIcon}>
-          <MaterialCommunityIcons name="shovel" size={18} color={colors.secondary} />
-          </View>
-          <View style={styles.selectText}>
-            <Text style={styles.selectValue}>
-              {soilOptions.find((o) => o.value === soilType)?.label || 'Choose soil'}
-            </Text>
-            <Text style={styles.selectHint}>
-              {soilOptions.find((o) => o.value === soilType)?.description || 'Select from the list'}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
-        </TouchableOpacity>
-
-        <Text style={styles.label}>Temperature</Text>
-        <View style={styles.inputRow}>
-          <MaterialCommunityIcons name="thermometer" size={18} color={colors.secondary} />
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={temperature}
-            onChangeText={setTemperature}
-            placeholder="26"
-            placeholderTextColor={colors.lightText}
-          />
-          <Text style={styles.unit}>°C</Text>
-        </View>
-
-        <Text style={styles.label}>Rainfall</Text>
-        <View style={styles.inputRow}>
-          <MaterialCommunityIcons name="weather-rainy" size={18} color={colors.secondary} />
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={rainfall}
-            onChangeText={setRainfall}
-            placeholder="180"
-            placeholderTextColor={colors.lightText}
-          />
-          <Text style={styles.unit}>mm</Text>
-        </View>
-
-        {!!saved && <Text style={styles.saved}>{saved}</Text>}
-
-        <TouchableOpacity style={styles.primaryButton} onPress={handleAnalyze} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="chart-box-outline" size={18} color={colors.white} />
-              <Text style={styles.primaryButtonText}>Analyze</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity: cardIn,
-            transform: [
-              {
-                translateY: cardIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [22, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recommendations</Text>
-          <View style={styles.sectionPill}>
-            <Text style={styles.sectionPillText}>{result ? `${result.length} crops` : 'Pending'}</Text>
-          </View>
-        </View>
-        {!result && !loading && <Text style={styles.empty}>No results yet. Run analysis to see suggestions.</Text>}
-        {result?.map((r, i) => (
-          <View key={i} style={styles.resultRow}>
-            <View style={styles.resultIcon}>
-              <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
-            </View>
-            <View style={styles.resultText}>
-              <Text style={styles.resultTitle}>{r.crop}</Text>
-              <Text style={styles.resultSubtitle}>{r.confidence}% confidence</Text>
-            </View>
-          </View>
-        ))}
-        {result && (
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <MaterialCommunityIcons name="content-save-outline" size={18} color={colors.white} />
-            <Text style={styles.saveButtonText}>Save Analysis</Text>
+        <View style={styles.topNavRow}>
+          <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={16} color={colors.primary} />
+            <Text style={styles.topNavBtnText}>Back</Text>
           </TouchableOpacity>
-        )}
-      </Animated.View>
-      <SelectModal
-        styles={styles}
-        colors={colors}
-        visible={seasonOpen}
-        title="Select season"
-        onClose={() => setSeasonOpen(false)}
-        options={seasonOptions}
-        value={season}
-        onSelect={(value) => {
-          setSeason(value as 'First' | 'Second');
-          setSeasonOpen(false);
-        }}
-      />
-      <SelectModal
-        styles={styles}
-        colors={colors}
-        visible={soilOpen}
-        title="Select soil type"
-        onClose={() => setSoilOpen(false)}
-        options={soilOptions}
-        value={soilType}
-        onSelect={(value) => {
-          setSoilType(value as 'Loam' | 'Clay' | 'Sandy');
-          setSoilOpen(false);
-        }}
-      />
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+          <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.navigate('Main')}>
+            <MaterialCommunityIcons name="home-outline" size={16} color={colors.primary} />
+            <Text style={styles.topNavBtnText}>Home</Text>
+          </TouchableOpacity>
+        </View>
 
-type SelectOption = {
-  label: string;
-  value: string;
-  description?: string;
-  icon?: string;
-};
-
-const SelectModal = ({
-  visible,
-  title,
-  onClose,
-  options,
-  value,
-  onSelect,
-  styles,
-  colors,
-}: {
-  visible: boolean;
-  title: string;
-  onClose: () => void;
-  options: SelectOption[];
-  value: string;
-  onSelect: (value: string) => void;
-  styles: any;
-  colors: any;
-}) => {
-  const slide = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.timing(slide, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    } else {
-      slide.setValue(0);
-    }
-  }, [visible, slide]);
-
-  const translateY = slide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [24, 0],
-  });
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Animated.View style={[styles.modalCard, { transform: [{ translateY }] }]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
-            </TouchableOpacity>
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <MaterialCommunityIcons name="map-marker-radius-outline" size={20} color={colors.primary} />
           </View>
-          {options.map((opt) => {
-            const selected = opt.value === value;
-            return (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.modalOption, selected && styles.modalOptionActive]}
-                onPress={() => onSelect(opt.value)}
-              >
-                <View style={styles.modalIcon}>
-                  <MaterialCommunityIcons
-                    name={(opt.icon as any) || 'circle-outline'}
-                    size={18}
-                    color={selected ? colors.primary : colors.secondary}
-                  />
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Planting in Luwero</Text>
+            <Text style={styles.subtitle}>Choose a target sub-county to get local crop and season timing advice</Text>
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>How It Works</Text>
+          <Text style={styles.cardText}>
+            SmartCrop maps your selected sub-county to local soil conditions and seasonal patterns, then suggests crops
+            with harvest timing.
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Select Sub-county</Text>
+          {loadingZones ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <TouchableOpacity style={styles.selectField} onPress={() => setSubCountyOpen(true)}>
+              <View style={styles.selectTextWrap}>
+                <Text style={styles.selectLabel}>Sub-county</Text>
+                <Text style={styles.selectValue}>{selectedZone?.sub_county || 'Select sub-county'}</Text>
+                <Text style={styles.selectHint}>Mapped soil: {selectedZone?.soil_type || 'N/A'}</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.primaryButton} onPress={runAnalysis} disabled={analyzing || loadingZones}>
+            {analyzing ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="chart-box-outline" size={18} color={colors.white} />
+                <Text style={styles.primaryButtonText}>Run Analysis</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {!!error && <Text style={styles.error}>{error}</Text>}
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.resultsHeader}>
+            <Text style={styles.cardTitle}>Recommendations</Text>
+            <Text style={styles.countPill}>{recommendations ? `${recommendations.length} crops` : 'No data'}</Text>
+          </View>
+          {!recommendations && <Text style={styles.cardText}>Select sub-county and run analysis.</Text>}
+          {recommendations?.map((item, idx) => (
+            <View key={`${item.crop}-${idx}`} style={styles.resultCard}>
+              <View style={styles.resultRow}>
+                <View style={styles.resultIcon}>
+                  <MaterialCommunityIcons name="sprout" size={17} color={colors.primary} />
                 </View>
-                <View style={styles.modalText}>
-                  <Text style={[styles.modalLabel, selected && styles.modalLabelActive]}>{opt.label}</Text>
-                  {!!opt.description && <Text style={styles.modalDesc}>{opt.description}</Text>}
+                <View style={styles.resultTextWrap}>
+                  <Text style={styles.resultTitle}>{item.crop}</Text>
+                  <Text style={styles.resultMeta}>{item.confidence}% confidence</Text>
                 </View>
-                {selected && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
+              </View>
+              {!!item.explanation && <Text style={styles.resultHint}>{item.explanation}</Text>}
+              <View style={styles.planChipRow}>
+                {!!item?.planning?.harvest_window && (
+                  <View style={styles.planChip}>
+                    <MaterialCommunityIcons name="calendar-clock-outline" size={13} color={colors.secondary} />
+                    <Text style={styles.planChipText}>{item.planning.harvest_window}</Text>
+                  </View>
+                )}
+                {!!item?.planning?.duration_days && (
+                  <View style={styles.planChip}>
+                    <MaterialCommunityIcons name="timer-sand" size={13} color={colors.secondary} />
+                    <Text style={styles.planChipText}>{item.planning.duration_days} days</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
+          {!!recommendations && (
+            <TouchableOpacity style={styles.saveButton} onPress={saveToHistory} disabled={saving}>
+              {saving ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="content-save-outline" size={18} color={colors.white} />
+                  <Text style={styles.saveButtonText}>Save to History</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal visible={subCountyOpen} transparent animationType="fade" onRequestClose={() => setSubCountyOpen(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setSubCountyOpen(false)}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Sub-county</Text>
+              <TouchableOpacity onPress={() => setSubCountyOpen(false)}>
+                <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
               </TouchableOpacity>
-            );
-          })}
-        </Animated.View>
-      </Pressable>
-    </Modal>
+            </View>
+            <FlatList
+              data={sortedZones}
+              keyExtractor={(item) => item.sub_county}
+              showsVerticalScrollIndicator={false}
+              initialNumToRender={10}
+              maxToRenderPerBatch={12}
+              windowSize={8}
+              renderItem={renderZone}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+      {!!toast && (
+        <View style={[styles.toast, toast.type === 'error' ? styles.toastError : styles.toastSuccess]}>
+          <MaterialCommunityIcons
+            name={toast.type === 'error' ? 'alert-circle-outline' : 'check-circle-outline'}
+            size={16}
+            color={colors.white}
+          />
+          <Text style={styles.toastText}>{toast.message}</Text>
+        </View>
+      )}
+    </SafeAreaView>
   );
 };
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 24 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EAF4EA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerText: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.primary, letterSpacing: 0.2 },
-  subtitle: { fontSize: 14, color: colors.lightText, marginTop: 2 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.secondary, marginBottom: 6 },
-  sectionHint: { fontSize: 12, color: colors.lightText, marginBottom: 12 },
-  label: { fontSize: 13, fontWeight: '700', color: colors.secondary, marginBottom: 6 },
-  selectField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: colors.inputBg,
-    marginBottom: 12,
-  },
-  selectIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  selectText: { flex: 1 },
-  selectValue: { color: colors.text, fontWeight: '700', fontSize: 14 },
-  selectHint: { color: colors.lightText, fontSize: 12, marginTop: 2 },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    backgroundColor: colors.inputBg,
-    marginBottom: 12,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    paddingHorizontal: 10,
-    color: colors.text,
-  },
-  unit: { color: colors.lightText, fontWeight: '600', marginLeft: 6 },
-  saved: { color: colors.secondary, marginBottom: 10 },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  primaryButtonText: { color: colors.white, fontWeight: '600', fontSize: 16 },
-  saveButton: {
-    marginTop: 12,
-    backgroundColor: colors.secondary,
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  saveButtonText: { color: colors.white, fontWeight: '600', fontSize: 14 },
-  empty: { color: colors.lightText, fontSize: 14 },
-  resultRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  resultIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  resultText: { flex: 1 },
-  resultTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  resultSubtitle: { color: colors.lightText, fontSize: 12, marginTop: 2 },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sectionPill: {
-    backgroundColor: colors.pillBg,
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-    borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  sectionPillText: { fontSize: 11, color: colors.secondary, fontWeight: '600' },
-  bgAccent: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: colors.iconBg,
-    right: -80,
-    top: -60,
-    opacity: 0.6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    maxHeight: Platform.OS === 'web' ? 420 : 520,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: colors.secondary },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.inputBg,
-    marginBottom: 10,
-  },
-  modalOptionActive: { borderColor: colors.pillBorder, backgroundColor: colors.pillBg },
-  modalIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  modalText: { flex: 1 },
-  modalLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
-  modalLabelActive: { color: colors.primary },
-  modalDesc: { fontSize: 12, color: colors.lightText, marginTop: 2 },
-});
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: 16, paddingBottom: 24 },
+    topNavRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+      gap: 10,
+    },
+    topNavBtn: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      backgroundColor: colors.card,
+      paddingVertical: 9,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    topNavBtnText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: colors.primary,
+      fontWeight: WEIGHT.semibold,
+    },
+    header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+    headerIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.iconBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10,
+    },
+    headerText: { flex: 1 },
+    title: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.h2,
+      fontWeight: WEIGHT.bold,
+      color: colors.primary,
+    },
+    subtitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: colors.lightText,
+      marginTop: 2,
+      lineHeight: 18,
+    },
+    card: {
+      backgroundColor: colors.glass,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      padding: 14,
+      marginBottom: 12,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
+    },
+    cardTitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.bold,
+      color: colors.secondary,
+      marginBottom: 8,
+    },
+    cardText: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, lineHeight: 20, color: colors.text },
+    selectField: {
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 12,
+      padding: 12,
+      backgroundColor: colors.glassSoft,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    selectTextWrap: { flex: 1, paddingRight: 10 },
+    selectLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.lightText, marginBottom: 4 },
+    selectValue: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.text, fontWeight: WEIGHT.bold },
+    selectHint: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginTop: 2 },
+    zoneTextWrap: { flex: 1 },
+    zoneName: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.bold, color: colors.text },
+    zoneNameActive: { color: colors.primary },
+    zoneSoil: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginTop: 2 },
+    primaryButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 4,
+    },
+    primaryButtonText: { color: colors.white, fontFamily: FONT_FAMILY, fontWeight: WEIGHT.bold, fontSize: TYPE.bodySmall },
+    error: { marginTop: 10, color: colors.error, fontFamily: FONT_FAMILY, fontSize: TYPE.caption },
+    resultsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    countPill: {
+      fontSize: TYPE.tiny,
+      color: colors.secondary,
+      backgroundColor: colors.pillBg,
+      borderColor: colors.pillBorder,
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingVertical: 3,
+      paddingHorizontal: 9,
+      fontWeight: WEIGHT.bold,
+      fontFamily: FONT_FAMILY,
+    },
+    resultCard: {
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 12,
+      backgroundColor: colors.glassSoft,
+      padding: 10,
+    },
+    resultRow: { flexDirection: 'row', alignItems: 'center' },
+    resultIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 9,
+      backgroundColor: colors.iconBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 9,
+    },
+    resultTextWrap: { flex: 1 },
+    resultTitle: { color: colors.text, fontFamily: FONT_FAMILY, fontWeight: WEIGHT.bold, fontSize: TYPE.bodySmall },
+    resultMeta: { color: colors.lightText, fontFamily: FONT_FAMILY, fontSize: TYPE.caption, marginTop: 2 },
+    resultHint: { color: colors.text, fontFamily: FONT_FAMILY, fontSize: TYPE.caption, marginTop: 4, lineHeight: 18 },
+    planChipRow: {
+      marginTop: 8,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    planChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.glass,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 999,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+    },
+    planChipText: {
+      marginLeft: 5,
+      color: colors.secondary,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      fontWeight: WEIGHT.semibold,
+    },
+    saveButton: {
+      marginTop: 12,
+      borderRadius: 12,
+      paddingVertical: 10,
+      backgroundColor: colors.secondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    saveButtonText: { color: colors.white, fontFamily: FONT_FAMILY, fontWeight: WEIGHT.bold, fontSize: TYPE.bodySmall },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      justifyContent: 'flex-end',
+    },
+    modalCard: {
+      backgroundColor: colors.glass,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      padding: 14,
+      maxHeight: 500,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    modalTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, color: colors.secondary, fontWeight: WEIGHT.bold },
+    modalOption: {
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 12,
+      padding: 10,
+      marginBottom: 8,
+      backgroundColor: colors.glassSoft,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    modalOptionActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.pillBg,
+    },
+    toast: {
+      position: 'absolute',
+      top: 14,
+      left: 16,
+      right: 16,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      zIndex: 30,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    toastSuccess: {
+      backgroundColor: colors.primary,
+    },
+    toastError: {
+      backgroundColor: colors.error,
+    },
+    toastText: {
+      marginLeft: 8,
+      color: colors.white,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+      flex: 1,
+    },
+  });
 
 export default ManualAnalysisScreen;

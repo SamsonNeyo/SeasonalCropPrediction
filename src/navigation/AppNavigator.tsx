@@ -16,6 +16,8 @@ import ManualAnalysisScreen from '../screens/ManualAnalysisScreen';
 import AIAdvisorScreen from '../screens/AIAdvisorScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import ForecastScreen from '../screens/ForecastScreen';
+import ProfileSetupScreen from '../screens/ProfileSetupScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -48,6 +50,7 @@ const MainTabs = () => {
           if (route.name === 'Home') iconName = 'home-variant-outline';
           if (route.name === 'Manual') iconName = 'sprout-outline';
           if (route.name === 'AI') iconName = 'brain';
+          if (route.name === 'Forecast') iconName = 'chart-line';
           if (route.name === 'History') iconName = 'history';
           if (route.name === 'Profile') iconName = 'account-circle-outline';
           return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
@@ -55,8 +58,8 @@ const MainTabs = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Manual" component={ManualAnalysisScreen} options={{ title: 'Manual Analysis' }} />
       <Tab.Screen name="AI" component={AIAdvisorScreen} options={{ title: 'AI Advisor' }} />
+      <Tab.Screen name="Forecast" component={ForecastScreen} />
       <Tab.Screen name="History" component={HistoryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -64,9 +67,14 @@ const MainTabs = () => {
 };
 
 const AppNavigator = () => {
-  const { user, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
   const [initialState, setInitialState] = useState<any>(undefined);
   const [isReady, setIsReady] = useState(Platform.OS !== 'web');
+  const isProfileComplete = (() => {
+    if (!userData) return false;
+    if (typeof userData.profileComplete === 'boolean') return userData.profileComplete;
+    return !!String(userData.subCounty || '').trim();
+  })();
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -105,8 +113,13 @@ const AppNavigator = () => {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Signup" component={SignupScreen} />
           </>
+        ) : !isProfileComplete ? (
+          <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         ) : (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="ManualAnalysis" component={ManualAnalysisScreen} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
