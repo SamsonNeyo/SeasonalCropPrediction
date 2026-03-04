@@ -14,6 +14,10 @@ const PredictionCard = ({ prediction }: { prediction: any }) => {
 
   return (
     <View style={styles.card}>
+      <View style={styles.cardBadge}>
+        <MaterialCommunityIcons name="flash-outline" size={13} color={colors.primary} />
+        <Text style={styles.cardBadgeText}>Recommended Action</Text>
+      </View>
       <View style={styles.row}>
         <View style={styles.icon}>
           <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
@@ -62,6 +66,25 @@ const createStyles = (colors: any) =>
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
+  },
+  cardBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.pillBorder,
+    backgroundColor: colors.pillBg,
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 10,
+  },
+  cardBadgeText: {
+    marginLeft: 4,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.tiny,
+    color: colors.primary,
+    fontWeight: WEIGHT.semibold,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
   icon: {

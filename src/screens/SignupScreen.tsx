@@ -182,8 +182,10 @@ const SignupScreen = ({ navigation }: any) => {
             onChangeText={setConfirmPassword}
           />
 
-          <Pressable style={styles.checkboxRow} onPress={() => setAcceptTerms(!acceptTerms)}>
-            <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]} />
+          <Pressable style={styles.checkboxRow} onPress={() => setAcceptTerms(!acceptTerms)} hitSlop={6}>
+            <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}>
+              {acceptTerms && <MaterialCommunityIcons name="check" size={12} color={colors.white} />}
+            </View>
             <Text style={styles.checkboxText}>I agree to the Terms & Privacy Policy</Text>
           </Pressable>
 
@@ -332,13 +334,15 @@ const createStyles = (colors: any) =>
       marginBottom: 12,
     },
     checkbox: {
-      width: 17,
-      height: 17,
-      borderRadius: 5,
+      width: 20,
+      height: 20,
+      borderRadius: 6,
       borderWidth: 1,
       borderColor: colors.border,
       marginRight: 8,
       backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     checkboxChecked: {
       backgroundColor: colors.primary,

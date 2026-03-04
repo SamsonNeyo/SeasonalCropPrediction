@@ -13,6 +13,7 @@ import {
   Switch,
   Modal,
   Pressable,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -187,6 +188,16 @@ const ProfileScreen = ({ navigation }: any) => {
     }
   };
 
+  const ensureAndroidTipsChannel = async () => {
+    if (Platform.OS !== 'android') return;
+    await Notifications.setNotificationChannelAsync('farming-tips', {
+      name: 'Farming tips',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 200, 200, 200],
+      lightColor: '#4A9C5A',
+    });
+  };
+
   const ensureNotifPermission = async (): Promise<boolean> => {
     const current = await Notifications.getPermissionsAsync();
     if (current.status === 'granted') return true;
@@ -195,6 +206,7 @@ const ProfileScreen = ({ navigation }: any) => {
   };
 
   const scheduleTips = async () => {
+    await ensureAndroidTipsChannel();
     const ok = await ensureNotifPermission();
     if (!ok) return false;
     const existing = await AsyncStorage.getItem('smartcrop_tips_notif_id');
@@ -204,7 +216,20 @@ const ProfileScreen = ({ navigation }: any) => {
         title: 'SmartCrop tip',
         body: 'Weekly farm tip: check soil moisture before planting.',
       },
-      trigger: { weekday: 1, hour: 8, minute: 0, repeats: true },
+      trigger:
+        Platform.OS === 'android'
+          ? {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour: 8,
+              minute: 0,
+              channelId: 'farming-tips',
+            }
+          : {
+              type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+              weekday: 1,
+              hour: 8,
+              minute: 0,
+            },
     });
     await AsyncStorage.setItem('smartcrop_tips_notif_id', id);
     return true;
@@ -215,6 +240,43 @@ const ProfileScreen = ({ navigation }: any) => {
     if (existing) {
       await Notifications.cancelScheduledNotificationAsync(existing);
       await AsyncStorage.removeItem('smartcrop_tips_notif_id');
+    }
+  };
+
+  const scheduleWeatherAlerts = async () => {
+    await ensureAndroidTipsChannel();
+    const ok = await ensureNotifPermission();
+    if (!ok) return false;
+    const existing = await AsyncStorage.getItem('smartcrop_weather_notif_id');
+    if (existing) return true;
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'SmartCrop weather alert',
+        body: 'Check today weather forecast for heavy rain or dry spell risks.',
+      },
+      trigger:
+        Platform.OS === 'android'
+          ? {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour: 6,
+              minute: 30,
+              channelId: 'farming-tips',
+            }
+          : {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour: 6,
+              minute: 30,
+            },
+    });
+    await AsyncStorage.setItem('smartcrop_weather_notif_id', id);
+    return true;
+  };
+
+  const cancelWeatherAlerts = async () => {
+    const existing = await AsyncStorage.getItem('smartcrop_weather_notif_id');
+    if (existing) {
+      await Notifications.cancelScheduledNotificationAsync(existing);
+      await AsyncStorage.removeItem('smartcrop_weather_notif_id');
     }
   };
 
@@ -254,6 +316,16 @@ const ProfileScreen = ({ navigation }: any) => {
         <Text style={styles.name}>{displayName}</Text>
         <Text style={styles.email}>{user?.email || 'user@smartcrop.app'}</Text>
         <Text style={styles.tapHint}>Tap the photo to change</Text>
+        <View style={styles.profileMetaRow}>
+          <View style={styles.profileMetaChip}>
+            <MaterialCommunityIcons name="map-marker-outline" size={13} color={colors.secondary} />
+            <Text style={styles.profileMetaText}>{subCounty}</Text>
+          </View>
+          <View style={styles.profileMetaChip}>
+            <MaterialCommunityIcons name="layers-outline" size={13} color={colors.secondary} />
+            <Text style={styles.profileMetaText}>{soilType}</Text>
+          </View>
+        </View>
       </Animated.View>
 
       <Animated.View
@@ -272,6 +344,10 @@ const ProfileScreen = ({ navigation }: any) => {
           },
         ]}
       >
+        <View style={styles.sectionBadge}>
+          <MaterialCommunityIcons name="account-edit-outline" size={13} color={colors.primary} />
+          <Text style={styles.sectionBadgeText}>Identity</Text>
+        </View>
         <Text style={styles.sectionTitle}>Farm Profile</Text>
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Name</Text>
@@ -338,6 +414,10 @@ const ProfileScreen = ({ navigation }: any) => {
           },
         ]}
       >
+        <View style={styles.sectionBadge}>
+          <MaterialCommunityIcons name="chart-box-outline" size={13} color={colors.primary} />
+          <Text style={styles.sectionBadgeText}>Snapshot</Text>
+        </View>
         <Text style={styles.sectionTitle}>Farm Snapshot</Text>
         <Text style={styles.sectionCaption}>Quick profile highlights for your planning context.</Text>
 
@@ -388,6 +468,10 @@ const ProfileScreen = ({ navigation }: any) => {
           },
         ]}
       >
+        <View style={styles.sectionBadge}>
+          <MaterialCommunityIcons name="cog-outline" size={13} color={colors.primary} />
+          <Text style={styles.sectionBadgeText}>Preferences</Text>
+        </View>
         <Text style={styles.sectionTitle}>Settings</Text>
         <Text style={styles.sectionCaption}>Personalize how SmartCrop works for you.</Text>
 
@@ -414,14 +498,32 @@ const ProfileScreen = ({ navigation }: any) => {
           <Switch
             value={tipsEnabled}
             onValueChange={async (v) => {
-              if (v) {
-                const ok = await scheduleTips();
-                setTipsEnabled(ok);
-                savePref('smartcrop_tips', ok);
-              } else {
-                await cancelTips();
-                setTipsEnabled(false);
-                savePref('smartcrop_tips', false);
+              try {
+                if (v) {
+                  const ok = await scheduleTips();
+                  if (!ok) {
+                    showToast('Enable notifications to receive farming tips.', 'error');
+                    setTipsEnabled(false);
+                    await savePref('smartcrop_tips', false);
+                    return;
+                  }
+                  setTipsEnabled(true);
+                  await savePref('smartcrop_tips', true);
+                } else {
+                  await cancelTips();
+                  setTipsEnabled(false);
+                  await savePref('smartcrop_tips', false);
+                }
+              } catch {
+                if (v) {
+                  showToast('Could not schedule farming tips on this device.', 'error');
+                  setTipsEnabled(false);
+                  await savePref('smartcrop_tips', false);
+                } else {
+                  showToast('Could not update farming tips notification.', 'error');
+                  setTipsEnabled(true);
+                  await savePref('smartcrop_tips', true);
+                }
               }
             }}
             trackColor={{ false: '#d9d9d9', true: '#A7D0A7' }}
@@ -437,13 +539,26 @@ const ProfileScreen = ({ navigation }: any) => {
           <Switch
             value={weatherAlerts}
             onValueChange={async (v) => {
-              if (v) {
-                const ok = await ensureNotifPermission();
-                setWeatherAlerts(ok);
-                savePref('smartcrop_weather_alerts', ok);
-              } else {
-                setWeatherAlerts(false);
-                savePref('smartcrop_weather_alerts', false);
+              try {
+                if (v) {
+                  const ok = await scheduleWeatherAlerts();
+                  if (!ok) {
+                    showToast('Enable notifications to receive weather alerts.', 'error');
+                    setWeatherAlerts(false);
+                    await savePref('smartcrop_weather_alerts', false);
+                    return;
+                  }
+                  setWeatherAlerts(true);
+                  await savePref('smartcrop_weather_alerts', true);
+                } else {
+                  await cancelWeatherAlerts();
+                  setWeatherAlerts(false);
+                  await savePref('smartcrop_weather_alerts', false);
+                }
+              } catch {
+                showToast('Could not update weather alerts notification.', 'error');
+                setWeatherAlerts(!v);
+                await savePref('smartcrop_weather_alerts', !v);
               }
             }}
             trackColor={{ false: '#d9d9d9', true: '#A7D0A7' }}
@@ -578,6 +693,28 @@ const createStyles = (colors: any) =>
   name: { fontFamily: FONT_FAMILY, fontSize: TYPE.h2, fontWeight: WEIGHT.bold, color: colors.primary },
   email: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 4 },
   tapHint: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.lightText, marginTop: 6 },
+  profileMetaRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  profileMetaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.pillBorder,
+    backgroundColor: colors.pillBg,
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+  },
+  profileMetaText: {
+    marginLeft: 4,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.tiny,
+    color: colors.secondary,
+    fontWeight: WEIGHT.semibold,
+  },
   card: {
     backgroundColor: colors.glass,
     borderRadius: 16,
@@ -591,9 +728,27 @@ const createStyles = (colors: any) =>
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
+  sectionBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.pillBorder,
+    borderRadius: 999,
+    backgroundColor: colors.pillBg,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  sectionBadgeText: {
+    marginLeft: 4,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.tiny,
+    color: colors.primary,
+    fontWeight: WEIGHT.semibold,
+  },
   sectionTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 10 },
   sectionCaption: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   rowText: { fontFamily: FONT_FAMILY, marginLeft: 8, color: colors.text, fontSize: TYPE.body },
   infoRow: {
     flexDirection: 'row',
@@ -687,19 +842,6 @@ const createStyles = (colors: any) =>
     color: colors.text,
     fontSize: TYPE.body,
   },
-  toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  toggle: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.inputBg,
-  },
-  toggleActive: { backgroundColor: colors.iconBg, borderColor: colors.primary },
-  toggleDisabled: { opacity: 0.6 },
-  toggleText: { fontFamily: FONT_FAMILY, color: colors.text, fontSize: TYPE.bodySmall },
-  toggleTextActive: { color: colors.primary, fontWeight: WEIGHT.semibold },
   error: { fontFamily: FONT_FAMILY, color: colors.error, textAlign: 'center', marginBottom: 10, fontSize: TYPE.bodySmall },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   secondaryButton: {

@@ -181,8 +181,14 @@ const LoginScreen = ({ navigation }: any) => {
           </View>
 
           <View style={styles.rowBetween}>
-            <Pressable style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)}>
-              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]} />
+            <Pressable
+              style={styles.checkboxRow}
+              onPress={() => setRememberMe(!rememberMe)}
+              hitSlop={6}
+            >
+              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                {rememberMe && <MaterialCommunityIcons name="check" size={12} color={colors.white} />}
+              </View>
               <Text style={styles.checkboxText}>Remember me</Text>
             </Pressable>
             <TouchableOpacity onPress={handleResetPassword}>
@@ -342,13 +348,15 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
     },
     checkbox: {
-      width: 17,
-      height: 17,
-      borderRadius: 5,
+      width: 20,
+      height: 20,
+      borderRadius: 6,
       borderWidth: 1,
       borderColor: colors.border,
       marginRight: 8,
       backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     checkboxChecked: {
       backgroundColor: colors.primary,

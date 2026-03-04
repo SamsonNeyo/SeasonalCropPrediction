@@ -44,9 +44,78 @@ def _synthetic_dataset() -> pd.DataFrame:
     )
 
 
+def _find_column(df: pd.DataFrame, options: list[str]) -> str | None:
+    normalized = {str(col).strip().lower(): str(col) for col in df.columns}
+    for option in options:
+        candidate = normalized.get(option.strip().lower())
+        if candidate:
+            return candidate
+    return None
+
+
+def _soil_from_ph(ph_value: float | None) -> str:
+    if ph_value is None or pd.isna(ph_value):
+        return "Loam"
+    if ph_value < 5.8:
+        return "Clay Loam"
+    if ph_value > 7.2:
+        return "Sandy Loam"
+    return "Loam"
+
+
+def _prepare_dataset(df: pd.DataFrame) -> pd.DataFrame:
+    crop_col = _find_column(df, ["crop", "label", "crop_name", "recommendation"])
+    temp_col = _find_column(df, ["temperature", "temp", "avg_temperature"])
+    rain_col = _find_column(df, ["rainfall", "rain", "precipitation", "annual_rainfall"])
+    season_col = _find_column(df, ["season", "crop_season"])
+    soil_col = _find_column(df, ["soil_type", "soil", "soil_class"])
+    ph_col = _find_column(df, ["ph", "soil_ph"])
+
+    if crop_col is None or temp_col is None or rain_col is None:
+        raise ValueError(
+            "Dataset must include crop/label, temperature, and rainfall columns. "
+            f"Available columns: {list(df.columns)}"
+        )
+
+    prepared = pd.DataFrame(
+        {
+            "temperature": pd.to_numeric(df[temp_col], errors="coerce"),
+            "rainfall": pd.to_numeric(df[rain_col], errors="coerce"),
+            "crop": df[crop_col].astype(str).str.strip(),
+        }
+    )
+    if season_col is not None:
+        prepared["season"] = df[season_col].astype(str).str.strip().replace({"1": "First", "2": "Second"})
+    else:
+        prepared["season"] = np.where(prepared["rainfall"] >= 150, "First", "Second")
+
+    if soil_col is not None:
+        prepared["soil_type"] = df[soil_col].astype(str).str.strip()
+    else:
+        ph_series = pd.to_numeric(df[ph_col], errors="coerce") if ph_col is not None else pd.Series([None] * len(df))
+        prepared["soil_type"] = ph_series.apply(_soil_from_ph)
+
+    prepared["season"] = prepared["season"].replace(
+        {"first season": "First", "second season": "Second", "first": "First", "second": "Second"}
+    )
+    prepared["soil_type"] = prepared["soil_type"].replace(
+        {
+            "ferrallitic": "Clay Loam",
+            "clay": "Clay Loam",
+            "sandy": "Sandy Loam",
+            "sandy loam": "Sandy Loam",
+            "clay loam": "Clay Loam",
+            "loam": "Loam",
+        }
+    )
+    return prepared.dropna(subset=["season", "soil_type", "temperature", "rainfall", "crop"])
+
+
 def _load_dataset() -> pd.DataFrame:
     if DATA_PATH.exists():
-        return pd.read_csv(DATA_PATH)
+        print(f"Using local CSV dataset: {DATA_PATH}")
+        return _prepare_dataset(pd.read_csv(DATA_PATH))
+    print("Falling back to synthetic dataset.")
     return _synthetic_dataset()
 
 

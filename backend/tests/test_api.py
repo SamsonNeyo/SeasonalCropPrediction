@@ -42,3 +42,4 @@ def test_predict_sub_county_endpoint():
     assert isinstance(body.get("recommendations", []), list)
     if body["recommendations"]:
         assert "planning" in body["recommendations"][0]
+

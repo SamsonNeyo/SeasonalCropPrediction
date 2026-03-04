@@ -139,6 +139,12 @@ const HistoryScreen = () => {
       return true;
     });
   }, [items, filterSeason, filterYear]);
+  const summary = useMemo(() => {
+    const total = items.length;
+    const visible = filteredItems.length;
+    const withRecs = filteredItems.filter((item) => (item.recommendations || []).length > 0).length;
+    return { total, visible, withRecs };
+  }, [filteredItems, items.length]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -211,6 +217,21 @@ const HistoryScreen = () => {
               <Text style={styles.clearButtonText}>Clear filters</Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryValue}>{summary.visible}</Text>
+            <Text style={styles.summaryLabel}>Visible</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryValue}>{summary.withRecs}</Text>
+            <Text style={styles.summaryLabel}>With Crops</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryValue}>{summary.total}</Text>
+            <Text style={styles.summaryLabel}>Total Logs</Text>
+          </View>
         </View>
 
         <Animated.View
@@ -461,6 +482,32 @@ const createStyles = (colors: any) =>
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: colors.glass,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  summaryValue: {
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.body,
+    color: colors.primary,
+    fontWeight: WEIGHT.bold,
+  },
+  summaryLabel: {
+    marginTop: 2,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.tiny,
+    color: colors.lightText,
+  },
   filterTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 8 },
   filterRow: { flexDirection: 'row', gap: 10 },
   filterField: {
@@ -514,14 +561,14 @@ const createStyles = (colors: any) =>
   deleteBtn: { padding: 6 },
   recRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 6 },
   recChip: {
-    backgroundColor: colors.glassSoft,
+    backgroundColor: colors.pillBg,
     borderRadius: 12,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: colors.pillBorder,
   },
-  recChipText: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.text },
+  recChipText: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.secondary, fontWeight: WEIGHT.semibold },
   timestampText: { fontFamily: FONT_FAMILY, marginTop: 8, color: colors.lightText, fontSize: TYPE.tiny },
   listWrap: {},
   bgAccent: {

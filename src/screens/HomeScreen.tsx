@@ -52,6 +52,30 @@ const HomeScreen = () => {
 
   const seasonValue = useMemo(() => getCurrentSeason(), []);
   const todayLabel = useMemo(() => formatDate(new Date()), []);
+  const topRecommendation = useMemo(() => recommendations[0] || null, [recommendations]);
+  const seasonAction = useMemo(() => {
+    if (topRecommendation?.crop) {
+      return `Prioritize ${topRecommendation.crop} planning in ${userData?.subCounty || 'your sub-county'} this season.`;
+    }
+    return 'Collect latest field conditions to generate your next seasonal recommendation.';
+  }, [topRecommendation?.crop, userData?.subCounty]);
+  const riskChips = useMemo(() => {
+    const chips: Array<{ label: string; tone: 'low' | 'medium' | 'high' }> = [];
+    if (weather?.temperature != null) {
+      const t = Number(weather.temperature);
+      if (t >= 31) chips.push({ label: 'Heat stress risk', tone: 'high' });
+      else if (t <= 18) chips.push({ label: 'Cold growth risk', tone: 'medium' });
+      else chips.push({ label: 'Temperature stable', tone: 'low' });
+    }
+    if (weather?.description) {
+      const w = String(weather.description).toLowerCase();
+      if (w.includes('storm') || w.includes('heavy')) chips.push({ label: 'Heavy rain watch', tone: 'high' });
+      else if (w.includes('rain')) chips.push({ label: 'Rain support likely', tone: 'low' });
+      else if (w.includes('cloud')) chips.push({ label: 'Cloud cover expected', tone: 'low' });
+    }
+    if (!chips.length) chips.push({ label: 'Data refreshing', tone: 'medium' });
+    return chips.slice(0, 3);
+  }, [weather?.description, weather?.temperature]);
 
   const fetchWeatherContext = useCallback(async () => {
     const apiKey = process.env.EXPO_PUBLIC_OWM_API_KEY;
@@ -59,15 +83,19 @@ const HomeScreen = () => {
     try {
       const lat = 0.8333;
       const lon = 32.5;
+      const requestTs = Date.now();
       const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}&t=${requestTs}`,
+        {
+          cache: 'no-store',
+        }
       );
       const data = await res.json();
       if (!res.ok) return null;
       return {
         temperature: Number(data?.main?.temp) || null,
         condition: data?.weather?.[0]?.main || '',
-        description: data?.weather?.[0]?.description || '',
+        description: String(data?.weather?.[0]?.description || '').toLowerCase(),
         location: data?.name || 'Luwero',
       };
     } catch {
@@ -213,6 +241,29 @@ const HomeScreen = () => {
             <View style={styles.metaItem}>
               <Ionicons name="map-outline" size={16} color={colors.secondary} />
               <Text style={styles.metaText}>{userData?.subCounty || 'Bamunanika'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.todayActionCard}>
+            <View style={styles.todayActionHead}>
+              <View style={styles.todayActionIcon}>
+                <Ionicons name="flash-outline" size={14} color={colors.primary} />
+              </View>
+              <Text style={styles.todayActionTitle}>This Season Action</Text>
+            </View>
+            <Text style={styles.todayActionText}>{seasonAction}</Text>
+            <View style={styles.riskRow}>
+              {riskChips.map((chip, idx) => (
+                <View
+                  key={`${chip.label}-${idx}`}
+                  style={[
+                    styles.riskChip,
+                    chip.tone === 'high' ? styles.riskChipHigh : chip.tone === 'medium' ? styles.riskChipMedium : styles.riskChipLow,
+                  ]}
+                >
+                  <Text style={styles.riskChipText}>{chip.label}</Text>
+                </View>
+              ))}
             </View>
           </View>
 
@@ -424,6 +475,71 @@ const createStyles = (colors: any) =>
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 5 },
       elevation: 3,
+    },
+    todayActionCard: {
+      marginTop: 12,
+      borderWidth: 1,
+      borderColor: colors.pillBorder,
+      backgroundColor: colors.pillBg,
+      borderRadius: 14,
+      paddingVertical: 11,
+      paddingHorizontal: 11,
+    },
+    todayActionHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    todayActionIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.iconBg,
+      marginRight: 7,
+    },
+    todayActionTitle: {
+      color: colors.secondary,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.bold,
+    },
+    todayActionText: {
+      marginTop: 7,
+      color: colors.text,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      lineHeight: 18,
+    },
+    riskRow: {
+      marginTop: 9,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    riskChip: {
+      borderRadius: 999,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderWidth: 1,
+    },
+    riskChipLow: {
+      backgroundColor: colors.iconBg,
+      borderColor: colors.pillBorder,
+    },
+    riskChipMedium: {
+      backgroundColor: '#F3EEE2',
+      borderColor: '#D8C59A',
+    },
+    riskChipHigh: {
+      backgroundColor: '#F9E6E3',
+      borderColor: '#E6B1A8',
+    },
+    riskChipText: {
+      color: colors.text,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      fontWeight: WEIGHT.semibold,
     },
     seasonPlanTop: {
       flexDirection: 'row',

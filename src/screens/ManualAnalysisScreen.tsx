@@ -117,17 +117,6 @@ const ManualAnalysisScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.topNavRow}>
-          <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.goBack()}>
-            <MaterialCommunityIcons name="arrow-left" size={16} color={colors.primary} />
-            <Text style={styles.topNavBtnText}>Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.navigate('Main')}>
-            <MaterialCommunityIcons name="home-outline" size={16} color={colors.primary} />
-            <Text style={styles.topNavBtnText}>Home</Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.header}>
           <View style={styles.headerIcon}>
             <MaterialCommunityIcons name="map-marker-radius-outline" size={20} color={colors.primary} />
@@ -222,6 +211,16 @@ const ManualAnalysisScreen = ({ navigation }: any) => {
           )}
         </View>
       </ScrollView>
+      <View style={styles.bottomNavBar}>
+        <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="arrow-left" size={16} color={colors.primary} />
+          <Text style={styles.topNavBtnText}>Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.navigate('Main')}>
+          <MaterialCommunityIcons name="home-outline" size={16} color={colors.primary} />
+          <Text style={styles.topNavBtnText}>Home</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal visible={subCountyOpen} transparent animationType="fade" onRequestClose={() => setSubCountyOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setSubCountyOpen(false)}>
@@ -261,12 +260,16 @@ const ManualAnalysisScreen = ({ navigation }: any) => {
 const createStyles = (colors: any) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 16, paddingBottom: 24 },
-    topNavRow: {
+    content: { padding: 16, paddingBottom: 104 },
+    bottomNavBar: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      bottom: 12,
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 10,
       gap: 10,
+      zIndex: 10,
     },
     topNavBtn: {
       flex: 1,
@@ -331,6 +334,29 @@ const createStyles = (colors: any) =>
       marginBottom: 8,
     },
     cardText: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, lineHeight: 20, color: colors.text },
+    weatherRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    weatherPill: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+      backgroundColor: colors.glassSoft,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    weatherText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: colors.text,
+      fontWeight: WEIGHT.semibold,
+    },
     selectField: {
       borderWidth: 1,
       borderColor: colors.glassBorder,

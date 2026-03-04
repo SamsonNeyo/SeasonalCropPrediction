@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -25,6 +25,7 @@ const PERSISTENCE_KEY = 'smartcrop-nav-state';
 
 const MainTabs = () => {
   const { colors } = useTheme();
+  const styles = React.useMemo(() => createTabStyles(colors), [colors]);
 
   return (
     <Tab.Navigator
@@ -33,27 +34,54 @@ const MainTabs = () => {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.lightText,
+        tabBarShowLabel: true,
+        tabBarHideOnKeyboard: true,
+        sceneStyle: {
+          paddingBottom: 96,
+          backgroundColor: colors.background,
+        },
         tabBarStyle: {
-          height: 68,
-          paddingBottom: 9,
-          paddingTop: 8,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
+          height: 76,
+          paddingBottom: 12,
+          paddingTop: 10,
+          borderTopWidth: 0,
           backgroundColor: colors.surface,
+          borderRadius: 24,
+          marginHorizontal: 12,
+          marginBottom: Platform.OS === 'ios' ? 14 : 10,
+          position: 'absolute',
+          shadowColor: colors.shadow,
+          shadowOpacity: 0.16,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 12,
+          overflow: 'visible',
+        },
+        tabBarItemStyle: styles.tabItem,
+        tabBarIconStyle: {
+          marginTop: 2,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '700',
+          lineHeight: 12,
+          marginTop: 2,
+          marginBottom: 2,
         },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ color, size, focused }) => {
           let iconName = 'home-variant-outline';
           if (route.name === 'Home') iconName = 'home-variant-outline';
-          if (route.name === 'Manual') iconName = 'sprout-outline';
           if (route.name === 'AI') iconName = 'brain';
           if (route.name === 'Forecast') iconName = 'chart-line';
           if (route.name === 'History') iconName = 'history';
           if (route.name === 'Profile') iconName = 'account-circle-outline';
-          return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
+          const wrapperStyle = [styles.iconWrap, focused && styles.iconWrapFocused];
+
+          return (
+            <View style={wrapperStyle}>
+              <MaterialCommunityIcons name={iconName} size={size} color={color} />
+            </View>
+          );
         },
       })}
     >
@@ -67,9 +95,24 @@ const MainTabs = () => {
 };
 
 const AppNavigator = () => {
+  const { colors, isDark } = useTheme();
   const { user, userData, loading } = useAuth();
   const [initialState, setInitialState] = useState<any>(undefined);
   const [isReady, setIsReady] = useState(Platform.OS !== 'web');
+  const navTheme = React.useMemo(() => {
+    const base = isDark ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        background: colors.background,
+        card: colors.surface,
+        text: colors.text,
+        border: colors.border,
+        primary: colors.primary,
+      },
+    };
+  }, [colors.background, colors.border, colors.primary, colors.surface, colors.text, isDark]);
   const isProfileComplete = (() => {
     if (!userData) return false;
     if (typeof userData.profileComplete === 'boolean') return userData.profileComplete;
@@ -96,6 +139,7 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer
+      theme={navTheme}
       initialState={initialState}
       onStateChange={(state) => {
         if (Platform.OS !== 'web') return;
@@ -106,7 +150,10 @@ const AppNavigator = () => {
         }
       }}
     >
-      <Stack.Navigator key={user ? 'user' : 'guest'} screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        key={user ? 'user' : 'guest'}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+      >
         {!user ? (
           <>
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
@@ -127,3 +174,22 @@ const AppNavigator = () => {
 };
 
 export default AppNavigator;
+
+const createTabStyles = (colors: any) =>
+  StyleSheet.create({
+    tabItem: {
+      paddingVertical: 4,
+    },
+    iconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconWrapFocused: {
+      backgroundColor: colors.pillBg,
+      borderWidth: 1,
+      borderColor: colors.pillBorder,
+    },
+  });

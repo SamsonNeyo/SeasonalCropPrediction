@@ -60,6 +60,11 @@ const AIAdvisorScreen = () => {
     `Top pests to watch in ${subCounty} during ${season} Season and control steps.`,
     `When should farmers in ${subCounty} prepare for harvest and selling in ${season} Season?`,
   ];
+  const answerSummary = useMemo(() => {
+    if (!answer) return '';
+    const firstSentence = answer.split(/[\n.!?]/).find((line) => line.trim().length > 18);
+    return firstSentence?.trim() || '';
+  }, [answer]);
 
   const handleAsk = async () => {
     if (!prompt.trim()) return;
@@ -95,11 +100,11 @@ const AIAdvisorScreen = () => {
           ]}
         >
           <View style={styles.headerIcon}>
-          <MaterialCommunityIcons name="brain" size={24} color={colors.primary} />
+            <MaterialCommunityIcons name="brain" size={24} color={colors.primary} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.title}>AI Advisor</Text>
-            <Text style={styles.subtitle}>Map-aware guidance for your sub-county and season</Text>
+            <Text style={styles.subtitle}>Decision support for your next farm action</Text>
           </View>
         </Animated.View>
 
@@ -119,6 +124,10 @@ const AIAdvisorScreen = () => {
             },
           ]}
         >
+          <View style={styles.sectionBadge}>
+            <MaterialCommunityIcons name="lightning-bolt-outline" size={13} color={colors.primary} />
+            <Text style={styles.sectionBadgeText}>Ask</Text>
+          </View>
           <View style={styles.contextCard}>
             <View style={styles.contextPill}>
               <MaterialCommunityIcons name="map-marker-radius-outline" size={14} color={colors.secondary} />
@@ -137,35 +146,35 @@ const AIAdvisorScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="Type your question here..."
-          placeholderTextColor={colors.lightText}
-          value={prompt}
-          onChangeText={setPrompt}
-          multiline
-        />
+            placeholderTextColor={colors.lightText}
+            value={prompt}
+            onChangeText={setPrompt}
+            multiline
+          />
 
-        <Text style={styles.label}>Quick prompts</Text>
-        <View style={styles.chipsRow}>
-          {QUICK_PROMPTS.map((item) => (
-            <TouchableOpacity key={item} style={styles.chip} onPress={() => setPrompt(item)}>
-              <Text style={styles.chipText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          <Text style={styles.label}>Suggested prompts</Text>
+          <View style={styles.chipsRow}>
+            {QUICK_PROMPTS.map((item) => (
+              <TouchableOpacity key={item} style={styles.chip} onPress={() => setPrompt(item)}>
+                <Text style={styles.chipText}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        <TouchableOpacity
-          style={[styles.primaryButton, (loading || !prompt.trim()) && styles.primaryButtonDisabled]}
-          onPress={handleAsk}
-          disabled={loading || !prompt.trim()}
-        >
-          {loading ? (
+          <TouchableOpacity
+            style={[styles.primaryButton, (loading || !prompt.trim()) && styles.primaryButtonDisabled]}
+            onPress={handleAsk}
+            disabled={loading || !prompt.trim()}
+          >
+            {loading ? (
               <ActivityIndicator color={colors.white} />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="star-four-points" size={18} color={colors.white} />
-              <Text style={styles.primaryButtonText}>Ask Advisor</Text>
-            </>
-          )}
-        </TouchableOpacity>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="star-four-points" size={18} color={colors.white} />
+                <Text style={styles.primaryButtonText}>Ask Advisor</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </Animated.View>
 
         <Animated.View
@@ -184,7 +193,12 @@ const AIAdvisorScreen = () => {
             },
           ]}
         >
+          <View style={styles.sectionBadge}>
+            <MaterialCommunityIcons name="file-document-outline" size={13} color={colors.primary} />
+            <Text style={styles.sectionBadgeText}>Decision</Text>
+          </View>
           <Text style={styles.label}>Advisor response</Text>
+          {!!answerSummary && !loading && <Text style={styles.summaryText}>{answerSummary}</Text>}
           {loading ? (
             <Text style={styles.answerMuted}>Thinking...</Text>
           ) : (
@@ -235,6 +249,25 @@ const createStyles = (colors: any) =>
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
+  sectionBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.pillBorder,
+    backgroundColor: colors.pillBg,
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 10,
+  },
+  sectionBadgeText: {
+    marginLeft: 4,
+    color: colors.primary,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.tiny,
+    fontWeight: WEIGHT.semibold,
+  },
   label: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 8 },
   input: {
     minHeight: 90,
@@ -249,7 +282,7 @@ const createStyles = (colors: any) =>
     fontSize: TYPE.body,
     textAlignVertical: 'top',
   },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
   chip: {
     backgroundColor: colors.glassSoft,
     borderRadius: 16,
@@ -259,8 +292,10 @@ const createStyles = (colors: any) =>
     marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.glassBorder,
+    maxWidth: '100%',
+    flexShrink: 1,
   },
-  chipText: { fontSize: TYPE.caption, color: colors.text, fontFamily: FONT_FAMILY },
+  chipText: { fontSize: TYPE.caption, color: colors.text, fontFamily: FONT_FAMILY, flexShrink: 1, flexWrap: 'wrap' },
   contextCard: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -297,6 +332,14 @@ const createStyles = (colors: any) =>
     backgroundColor: '#9DBA9D',
   },
   primaryButtonText: { color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body, fontFamily: FONT_FAMILY },
+  summaryText: {
+    color: colors.secondary,
+    fontSize: TYPE.bodySmall,
+    lineHeight: 20,
+    fontFamily: FONT_FAMILY,
+    marginBottom: 8,
+    fontWeight: WEIGHT.semibold,
+  },
   answer: { color: colors.text, fontSize: TYPE.bodySmall, lineHeight: 22, fontFamily: FONT_FAMILY },
   answerMuted: { color: colors.lightText, fontSize: TYPE.bodySmall, fontFamily: FONT_FAMILY },
   disclaimer: { marginTop: 12, color: colors.lightText, fontSize: TYPE.caption, fontFamily: FONT_FAMILY },
