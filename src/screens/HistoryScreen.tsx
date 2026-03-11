@@ -18,15 +18,20 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
 import { deleteHistoryItem, getUserHistory } from '../services/firestore';
+import { QueryDocumentSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 
 const HistoryScreen = () => {
+  const PAGE_SIZE = 50;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [yearOpen, setYearOpen] = useState(false);
   const [seasonOpen, setSeasonOpen] = useState(false);
   const [filterYear, setFilterYear] = useState<number | 'all'>('all');
@@ -41,10 +46,14 @@ const HistoryScreen = () => {
       setLoading(true);
       if (!user) {
         setItems([]);
+        setCursor(null);
+        setHasMore(false);
         return;
       }
-      const data = await getUserHistory();
+      const { items: data, lastDoc } = await getUserHistory({ limitCount: PAGE_SIZE });
       setItems(data || []);
+      setCursor(lastDoc);
+      setHasMore((data || []).length >= PAGE_SIZE);
     } catch (e: any) {
       const msg = e?.code || e?.message || 'Could not load history.';
       setError(`Could not load history: ${msg}`);
@@ -67,6 +76,22 @@ const HistoryScreen = () => {
     }
   };
 
+  const handleLoadMore = async () => {
+    if (!user || loadingMore || !hasMore) return;
+    try {
+      setLoadingMore(true);
+      const { items: data, lastDoc } = await getUserHistory({
+        limitCount: PAGE_SIZE,
+        startAfterDoc: cursor || undefined,
+      });
+      setItems((prev) => prev.concat(data || []));
+      setCursor(lastDoc);
+      if (!data || data.length < PAGE_SIZE) setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
     loadHistory();
     Animated.stagger(140, [
@@ -86,7 +111,7 @@ const HistoryScreen = () => {
   }, [user, headerIn, listIn]);
 
   const getItemDate = (item: any): Date | null => {
-    const ts = item?.timestamp;
+    const ts = item?.createdAt ?? item?.timestamp;
     if (!ts) return null;
     if (typeof ts === 'string') {
       const d = new Date(ts);
@@ -141,9 +166,9 @@ const HistoryScreen = () => {
   }, [items, filterSeason, filterYear]);
   const summary = useMemo(() => {
     const total = items.length;
-    const visible = filteredItems.length;
-    const withRecs = filteredItems.filter((item) => (item.recommendations || []).length > 0).length;
-    return { total, visible, withRecs };
+    const shown = filteredItems.length;
+    const hidden = Math.max(total - shown, 0);
+    return { total, shown, hidden };
   }, [filteredItems, items.length]);
 
   return (
@@ -219,18 +244,25 @@ const HistoryScreen = () => {
           )}
         </View>
 
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{summary.visible}</Text>
-            <Text style={styles.summaryLabel}>Visible</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{summary.withRecs}</Text>
-            <Text style={styles.summaryLabel}>With Crops</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{summary.total}</Text>
-            <Text style={styles.summaryLabel}>Total Logs</Text>
+        <View style={styles.summaryWrap}>
+          <View style={styles.summaryHeroCard}>
+            <View style={styles.summaryHeroTop}>
+              <Text style={styles.summaryHeroLabel}>Showing</Text>
+              <View style={styles.summaryHeroPill}>
+                <MaterialCommunityIcons name="filter-variant" size={12} color={colors.secondary} />
+                <Text style={styles.summaryHeroPillText}>
+                  {filterYear === 'all' && filterSeason === 'all' ? 'No active filters' : 'Filters active'}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.summaryHeroValue}>
+              {summary.shown} <Text style={styles.summaryHeroSub}>of {summary.total}</Text>
+            </Text>
+            <Text style={styles.summaryHeroHint}>
+              {summary.hidden > 0
+                ? `${summary.hidden} logs hidden by current filters`
+                : 'All logs are currently shown'}
+            </Text>
           </View>
         </View>
 
@@ -300,6 +332,19 @@ const HistoryScreen = () => {
                 )}
               </View>
             ))
+          )}
+          {hasMore && items.length > 0 && !loading && !error && (
+            <TouchableOpacity
+              onPress={handleLoadMore}
+              style={styles.loadMoreBtn}
+              disabled={loadingMore}
+            >
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={styles.loadMoreText}>Load more</Text>
+              )}
+            </TouchableOpacity>
           )}
         </Animated.View>
       </ScrollView>
@@ -482,30 +527,62 @@ const createStyles = (colors: any) =>
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 8,
+  summaryWrap: {
     marginBottom: 12,
+    gap: 8,
   },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: colors.glass,
-    borderRadius: 12,
+  summaryHeroCard: {
+    backgroundColor: colors.pillBg,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: colors.pillBorder,
     paddingVertical: 10,
-    alignItems: 'center',
+    paddingHorizontal: 11,
   },
-  summaryValue: {
+  summaryHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  summaryHeroLabel: {
     fontFamily: FONT_FAMILY,
-    fontSize: TYPE.body,
+    fontSize: TYPE.caption,
+    color: colors.secondary,
+    fontWeight: WEIGHT.semibold,
+  },
+  summaryHeroPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.pillBorder,
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    backgroundColor: colors.surface,
+  },
+  summaryHeroPillText: {
+    marginLeft: 4,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.tiny,
+    color: colors.secondary,
+    fontWeight: WEIGHT.semibold,
+  },
+  summaryHeroValue: {
+    marginTop: 6,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.h2,
     color: colors.primary,
     fontWeight: WEIGHT.bold,
   },
-  summaryLabel: {
+  summaryHeroSub: {
+    fontSize: TYPE.bodySmall,
+    color: colors.secondary,
+    fontWeight: WEIGHT.semibold,
+  },
+  summaryHeroHint: {
     marginTop: 2,
     fontFamily: FONT_FAMILY,
-    fontSize: TYPE.tiny,
+    fontSize: TYPE.caption,
     color: colors.lightText,
   },
   filterTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 8 },
@@ -571,6 +648,22 @@ const createStyles = (colors: any) =>
   recChipText: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.secondary, fontWeight: WEIGHT.semibold },
   timestampText: { fontFamily: FONT_FAMILY, marginTop: 8, color: colors.lightText, fontSize: TYPE.tiny },
   listWrap: {},
+  loadMoreBtn: {
+    marginTop: 4,
+    alignSelf: 'center',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glassSoft,
+  },
+  loadMoreText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.caption,
+    fontWeight: WEIGHT.semibold,
+    color: colors.secondary,
+  },
   bgAccent: {
     position: 'absolute',
     width: 240,

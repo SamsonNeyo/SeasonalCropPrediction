@@ -37,9 +37,14 @@ const getGreeting = () => {
 const formatDate = (d: Date) =>
   d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
+const HOME_CACHE_TTL_MS = 1000 * 60 * 30;
+const WEATHER_CACHE_TTL_MS = 1000 * 60 * 10;
+const WEATHER_BLUE = '#2E6FD8';
+
 const HomeScreen = () => {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const weatherMetaIconColor = useMemo(() => (isDark ? '#CFE1D7' : '#D7EADB'), [isDark]);
   const { userData, user } = useAuth();
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +52,7 @@ const HomeScreen = () => {
   const [weather, setWeather] = useState<any>(null);
   const [seasonAdvice, setSeasonAdvice] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const heroIn = useRef(new Animated.Value(0)).current;
+  const actionIn = useRef(new Animated.Value(0)).current;
   const listIn = useRef(new Animated.Value(0)).current;
 
   const seasonValue = useMemo(() => getCurrentSeason(), []);
@@ -76,34 +81,73 @@ const HomeScreen = () => {
     if (!chips.length) chips.push({ label: 'Data refreshing', tone: 'medium' });
     return chips.slice(0, 3);
   }, [weather?.description, weather?.temperature]);
+  const isRain = useMemo(() => {
+    const desc = String(weather?.description || '').toLowerCase();
+    const cond = String(weather?.condition || '').toLowerCase();
+    return desc.includes('rain') || desc.includes('storm') || desc.includes('drizzle') || cond.includes('rain');
+  }, [weather?.description, weather?.condition]);
 
   const fetchWeatherContext = useCallback(async () => {
     const apiKey = process.env.EXPO_PUBLIC_OWM_API_KEY;
     if (!apiKey) return null;
+    const cacheKey = 'smartcrop_weather_cache_luwero';
+    const now = Date.now();
+    try {
+      const cachedRaw = await AsyncStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached?.ts && now - cached.ts < WEATHER_CACHE_TTL_MS) {
+          return cached.data || null;
+        }
+      }
+    } catch {
+      // Ignore cache read failures.
+    }
     try {
       const lat = 0.8333;
       const lon = 32.5;
-      const requestTs = Date.now();
       const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}&t=${requestTs}`,
-        {
-          cache: 'no-store',
-        }
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
       );
       const data = await res.json();
       if (!res.ok) return null;
-      return {
+      const payload = {
         temperature: Number(data?.main?.temp) || null,
         condition: data?.weather?.[0]?.main || '',
         description: String(data?.weather?.[0]?.description || '').toLowerCase(),
         location: data?.name || 'Luwero',
       };
+      try {
+        await AsyncStorage.setItem(cacheKey, JSON.stringify({ ts: now, data: payload }));
+      } catch {
+        // Ignore cache write failures.
+      }
+      return payload;
     } catch {
       return null;
     }
   }, []);
 
+  const loadCachedHome = useCallback(async () => {
+    const subCounty = userData?.subCounty || 'Bamunanika';
+    const cacheKey = `smartcrop_home_cache_${user?.uid || 'guest'}_${subCounty}_${seasonValue}`;
+    try {
+      const raw = await AsyncStorage.getItem(cacheKey);
+      if (!raw) return false;
+      const cached = JSON.parse(raw);
+      if (!cached?.ts || Date.now() - cached.ts > HOME_CACHE_TTL_MS) return false;
+      setRecommendations(cached.recommendations || []);
+      setSeasonAdvice(cached.seasonAdvice || null);
+      setWeather(cached.weather || null);
+      setLoading(false);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [seasonValue, user?.uid, userData?.subCounty]);
+
   const maybeSaveSnapshot = useCallback(async (payload: any) => {
+    if (!user) return;
     const snapshotKey = `smartcrop_home_last_saved_${user?.uid || 'guest'}`;
     const fingerprint = JSON.stringify({
       sub_county: payload?.sub_county,
@@ -125,43 +169,59 @@ const HomeScreen = () => {
     const subCounty = userData?.subCounty || 'Bamunanika';
     try {
       setError('');
-      const [prediction, weatherContext] = await Promise.all([
-        predictBySubCounty({ sub_county: subCounty, season: seasonValue }),
-        fetchWeatherContext(),
-      ]);
+      const predictionPromise = predictBySubCounty({ sub_county: subCounty, season: seasonValue });
+      const weatherPromise = fetchWeatherContext();
+      const prediction = await predictionPromise;
       setRecommendations(prediction.recommendations || []);
       setSeasonAdvice(prediction.season_advice || null);
+      setLoading(false);
+      const weatherContext = await weatherPromise;
       setWeather(weatherContext);
-      await maybeSaveSnapshot({
+      void maybeSaveSnapshot({
         ...prediction.inputs,
         recommendations: prediction.recommendations || [],
       });
+      const cacheKey = `smartcrop_home_cache_${user?.uid || 'guest'}_${subCounty}_${seasonValue}`;
+      try {
+        await AsyncStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            ts: Date.now(),
+            recommendations: prediction.recommendations || [],
+            seasonAdvice: prediction.season_advice || null,
+            weather: weatherContext || null,
+          })
+        );
+      } catch {
+        // Ignore cache write failures.
+      }
     } catch (e: any) {
       setError(e?.message || 'Could not load seasonal recommendations.');
-      setRecommendations([]);
-      setSeasonAdvice(null);
+      setRecommendations((prev) => (prev?.length ? prev : []));
+      setSeasonAdvice((prev) => prev || null);
     } finally {
       setLoading(false);
     }
-  }, [fetchWeatherContext, maybeSaveSnapshot, seasonValue, userData?.subCounty]);
+  }, [fetchWeatherContext, maybeSaveSnapshot, seasonValue, userData?.subCounty, user?.uid]);
 
   useEffect(() => {
+    void loadCachedHome();
     fetchSeasonalRecommendations();
-    Animated.stagger(160, [
-      Animated.timing(heroIn, {
-        toValue: 1,
-        duration: 600,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
+    Animated.stagger(140, [
       Animated.timing(listIn, {
         toValue: 1,
         duration: 600,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
+      Animated.timing(actionIn, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
     ]).start();
-  }, [fetchSeasonalRecommendations]);
+  }, [fetchSeasonalRecommendations, listIn, loadCachedHome, actionIn]);
 
   const handleRefresh = async () => {
     try {
@@ -181,22 +241,6 @@ const HomeScreen = () => {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         >
-        <Animated.View
-          style={[
-            styles.hero,
-            {
-              opacity: heroIn,
-              transform: [
-                {
-                  translateY: heroIn.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [16, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
           <View style={styles.heroRow}>
             <View style={styles.heroText}>
               <Text style={styles.greeting}>{getGreeting()}, {userData?.name || 'Farmer'}</Text>
@@ -212,46 +256,89 @@ const HomeScreen = () => {
 
           {weather && (
             <View style={styles.weatherCard}>
-              <View style={styles.weatherTopRow}>
-                <View style={styles.weatherStat}>
-                  <Ionicons name="thermometer-outline" size={18} color={colors.secondary} />
-                  <Text style={styles.weatherText}>{weather.temperature} C</Text>
-                </View>
-                <View style={styles.weatherStat}>
-                  <Ionicons name="cloud-outline" size={18} color={colors.secondary} />
-                  <Text style={styles.weatherText} numberOfLines={1} ellipsizeMode="tail">
+              <View style={styles.weatherMainRow}>
+                <View style={styles.weatherLeft}>
+                  <View style={styles.weatherIconWrap}>
+                    <Ionicons name="cloud-outline" size={26} color={WEATHER_BLUE} />
+                    {isRain && (
+                      <Ionicons name="rainy-outline" size={16} color={WEATHER_BLUE} style={styles.weatherRain} />
+                    )}
+                  </View>
+                  <Text style={styles.weatherTemp}>{weather.temperature} C</Text>
+                  <Text style={styles.weatherCondition} numberOfLines={1} ellipsizeMode="tail">
                     {weather.description || weather.condition}
                   </Text>
                 </View>
-              </View>
-              <View style={styles.weatherLocationRow}>
-                <Ionicons name="location-outline" size={18} color={colors.secondary} />
-                <Text style={styles.weatherLocationText} numberOfLines={1} ellipsizeMode="tail">
-                  {weather.location || 'Luwero'}
-                </Text>
+                <View style={styles.weatherDivider} />
+                <View style={styles.weatherRight}>
+                  <Text style={styles.weatherLabel}>District</Text>
+                  <Text style={styles.weatherDistrict} numberOfLines={1} ellipsizeMode="tail">
+                    {weather.location || 'Luwero'}
+                  </Text>
+                  <View style={styles.weatherMetaRow}>
+                    <Ionicons name="calendar-outline" size={16} color={weatherMetaIconColor} />
+                    <Text style={styles.weatherMetaText}>{todayLabel}</Text>
+                  </View>
+                  <View style={styles.weatherMetaRow}>
+                    <Ionicons name="location-outline" size={16} color={weatherMetaIconColor} />
+                    <Text style={styles.weatherMetaText}>{userData?.subCounty || 'Bamunanika'}</Text>
+                  </View>
+                </View>
               </View>
             </View>
           )}
 
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="calendar-outline" size={16} color={colors.secondary} />
-              <Text style={styles.metaText}>{todayLabel}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Ionicons name="map-outline" size={16} color={colors.secondary} />
-              <Text style={styles.metaText}>{userData?.subCounty || 'Bamunanika'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.todayActionCard}>
-            <View style={styles.todayActionHead}>
-              <View style={styles.todayActionIcon}>
+          <Animated.View
+            style={[
+              styles.todayActionCard,
+              {
+                opacity: actionIn,
+                transform: [
+                  {
+                    translateY: actionIn.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [14, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.todayActionTop}>
+              <View style={styles.todayActionBadge}>
                 <Ionicons name="flash-outline" size={14} color={colors.primary} />
+                <Text style={styles.todayActionBadgeText}>Action</Text>
               </View>
-              <Text style={styles.todayActionTitle}>This Season Action</Text>
+              <View style={styles.todayActionPill}>
+                <Text style={styles.todayActionPillText}>Priority</Text>
+              </View>
+            </View>
+            <Text style={styles.todayActionTitle}>This Season Action</Text>
+            <View style={styles.todayActionMeta}>
+              <Text style={styles.todayActionMetaLabel}>Priority crop</Text>
+              <Animated.View
+                style={[
+                  styles.todayActionCropPill,
+                  {
+                    transform: [
+                      {
+                        scale: actionIn.interpolate({
+                          inputRange: [0, 0.7, 1],
+                          outputRange: [0.92, 1.06, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <Text style={styles.todayActionCropText}>
+                  {topRecommendation?.crop || 'Not set'}
+                  {topRecommendation?.confidence ? ` · ${topRecommendation.confidence}%` : ''}
+                </Text>
+              </Animated.View>
             </View>
             <Text style={styles.todayActionText}>{seasonAction}</Text>
+            <View style={styles.todayActionDivider} />
             <View style={styles.riskRow}>
               {riskChips.map((chip, idx) => (
                 <View
@@ -265,7 +352,7 @@ const HomeScreen = () => {
                 </View>
               ))}
             </View>
-          </View>
+          </Animated.View>
 
           {!!seasonAdvice && (
             <View style={styles.seasonPlanCard}>
@@ -320,7 +407,6 @@ const HomeScreen = () => {
               )}
             </View>
           )}
-        </Animated.View>
 
         <View style={styles.sectionWrap}>
           <View style={styles.sectionHeader}>
@@ -350,24 +436,18 @@ const HomeScreen = () => {
   );
 };
 
-const createStyles = (colors: any) =>
-  StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => {
+  const weatherCardBg = isDark ? '#0F2018' : '#1B5E3C';
+  const weatherCardBorder = isDark ? '#1C3528' : '#164E32';
+  const weatherIconBg = isDark ? '#1D3529' : '#F5FBF7';
+  const weatherIconBorder = isDark ? '#2A4A3A' : '#D6E8DE';
+  const weatherTextPrimary = isDark ? '#E9F1EC' : '#F4FAF6';
+  const weatherTextMuted = isDark ? '#BFD5C9' : '#D6E8DD';
+  const weatherDividerColor = isDark ? '#1C3528' : '#2A6F49';
+  return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     content: { flex: 1, padding: 16, paddingBottom: 10 },
     pageScrollContent: { paddingBottom: 32 },
-    hero: {
-      backgroundColor: colors.glass,
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      padding: 18,
-      marginBottom: 20,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.12,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 4,
-    },
     heroRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -406,60 +486,95 @@ const createStyles = (colors: any) =>
       fontFamily: FONT_FAMILY,
     },
     weatherCard: {
-      backgroundColor: colors.glassSoft,
-      borderRadius: 14,
+      backgroundColor: weatherCardBg,
+      borderRadius: 16,
       borderWidth: 1,
-      borderColor: colors.glassBorder,
-      paddingVertical: 10,
-      paddingHorizontal: 10,
+      borderColor: weatherCardBorder,
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
     },
-    weatherTopRow: {
+    weatherMainRow: {
       flexDirection: 'row',
-      gap: 8,
-      marginBottom: 8,
+      alignItems: 'flex-start',
+      gap: 14,
     },
-    weatherStat: {
+    weatherLeft: {
       flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.glass,
-      borderRadius: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 10,
+      alignItems: 'flex-start',
       minWidth: 0,
     },
-    weatherText: {
-      marginLeft: 6,
-      color: colors.text,
-      fontWeight: WEIGHT.semibold,
+    weatherRight: {
+      flex: 1,
+      alignItems: 'flex-start',
+      minWidth: 0,
+    },
+    weatherDivider: {
+      width: 1,
+      alignSelf: 'stretch',
+      backgroundColor: weatherDividerColor,
+      opacity: 0.9,
+    },
+    weatherIconWrap: {
+      width: 46,
+      height: 46,
+      borderRadius: 12,
+      backgroundColor: weatherIconBg,
+      borderWidth: 1,
+      borderColor: weatherIconBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    weatherRain: {
+      position: 'absolute',
+      right: 6,
+      bottom: 6,
+    },
+    weatherTemp: {
+      color: weatherTextPrimary,
+      fontWeight: WEIGHT.bold,
+      fontSize: TYPE.h3,
+      fontFamily: FONT_FAMILY,
+    },
+    weatherCondition: {
+      marginTop: 4,
+      color: weatherTextMuted,
       fontSize: TYPE.caption,
       fontFamily: FONT_FAMILY,
-      flex: 1,
+      lineHeight: 18,
+      textTransform: 'capitalize',
     },
-    weatherLocationRow: {
+    weatherLabel: {
+      color: weatherTextMuted,
+      fontSize: TYPE.tiny,
+      fontFamily: FONT_FAMILY,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    weatherDistrict: {
+      marginTop: 6,
+      color: weatherTextPrimary,
+      fontSize: TYPE.bodySmall,
+      fontFamily: FONT_FAMILY,
+      fontWeight: WEIGHT.semibold,
+    },
+    weatherMetaRow: {
+      marginTop: 8,
       flexDirection: 'row',
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.glass,
-      borderRadius: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 10,
+      gap: 6,
     },
-    weatherLocationText: {
-      marginLeft: 6,
-      color: colors.text,
-      fontWeight: WEIGHT.semibold,
+    weatherMetaText: {
+      color: weatherTextMuted,
       fontSize: TYPE.caption,
       fontFamily: FONT_FAMILY,
-      flex: 1,
-    },
-    metaRow: {
-      flexDirection: 'row',
-      gap: 8,
-      marginTop: 13,
+      fontWeight: WEIGHT.semibold,
+      flexShrink: 1,
     },
     seasonPlanCard: {
       marginTop: 12,
@@ -479,37 +594,109 @@ const createStyles = (colors: any) =>
     todayActionCard: {
       marginTop: 12,
       borderWidth: 1,
-      borderColor: colors.pillBorder,
-      backgroundColor: colors.pillBg,
+      borderColor: colors.border,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+      backgroundColor: colors.card,
       borderRadius: 14,
-      paddingVertical: 11,
-      paddingHorizontal: 11,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
     },
-    todayActionHead: {
+    todayActionTop: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
     },
-    todayActionIcon: {
-      width: 24,
-      height: 24,
-      borderRadius: 8,
+    todayActionBadge: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.iconBg,
-      marginRight: 7,
+      gap: 6,
+      backgroundColor: colors.pillBg,
+      borderWidth: 1,
+      borderColor: colors.pillBorder,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 999,
     },
-    todayActionTitle: {
+    todayActionBadgeText: {
       color: colors.secondary,
       fontFamily: FONT_FAMILY,
-      fontSize: TYPE.bodySmall,
+      fontSize: TYPE.tiny,
+      fontWeight: WEIGHT.semibold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    todayActionTitle: {
+      marginTop: 10,
+      color: colors.secondary,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
       fontWeight: WEIGHT.bold,
     },
+    todayActionPill: {
+      backgroundColor: colors.glass,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: 999,
+      paddingVertical: 2,
+      paddingHorizontal: 8,
+    },
+    todayActionPillText: {
+      color: colors.secondary,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      fontWeight: WEIGHT.semibold,
+    },
     todayActionText: {
-      marginTop: 7,
+      marginTop: 6,
       color: colors.text,
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.caption,
-      lineHeight: 18,
+      lineHeight: 20,
+    },
+    todayActionMeta: {
+      marginTop: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'wrap',
+    },
+    todayActionMetaLabel: {
+      color: colors.lightText,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    todayActionCropPill: {
+      backgroundColor: colors.pillBg,
+      borderWidth: 1,
+      borderColor: colors.pillBorder,
+      borderRadius: 999,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    todayActionCropText: {
+      color: colors.secondary,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+    },
+    todayActionDivider: {
+      marginTop: 10,
+      height: 1,
+      backgroundColor: colors.border,
+      opacity: 0.6,
     },
     riskRow: {
       marginTop: 9,
@@ -661,24 +848,6 @@ const createStyles = (colors: any) =>
       fontSize: TYPE.caption,
       lineHeight: 18,
     },
-    metaItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.glassSoft,
-      borderRadius: 11,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      paddingVertical: 7,
-      paddingHorizontal: 11,
-      flex: 1,
-    },
-    metaText: {
-      marginLeft: 6,
-      color: colors.text,
-      fontSize: TYPE.caption,
-      fontWeight: WEIGHT.semibold,
-      fontFamily: FONT_FAMILY,
-    },
     sectionWrap: {},
     listArea: { minHeight: 220 },
     sectionHeader: { marginBottom: 14, gap: 6 },
@@ -702,5 +871,6 @@ const createStyles = (colors: any) =>
       opacity: 0.75,
     },
   });
+};
 
 export default HomeScreen;

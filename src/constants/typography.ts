@@ -12,8 +12,8 @@ export const TYPE = {
 } as const;
 
 export const WEIGHT = {
-  regular: '400',
-  medium: '500',
-  semibold: '600',
-  bold: '700',
+  regular: '500',
+  medium: '600',
+  semibold: '700',
+  bold: '800',
 } as const;

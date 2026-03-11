@@ -117,7 +117,7 @@ const ForecastScreen = () => {
     const avgPrice = series.reduce((sum, row) => sum + (Number(row.average_price_ugx_per_kg) || 0), 0) / series.length;
     return [
       { label: '6-mo avg yield', value: formatYield(avgYield), icon: 'sprout-outline' },
-      { label: '6-mo avg price', value: `${formatUGX(avgPrice)}/kg`, icon: 'currency-usd' },
+      { label: '6-mo avg price', value: `${formatUGX(avgPrice)}/kg`, icon: 'cash-multiple' },
       { label: 'Months tracked', value: String(series.length), icon: 'calendar-range-outline' },
     ];
   }, [series]);

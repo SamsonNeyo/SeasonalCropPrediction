@@ -2,6 +2,24 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+type CacheEntry = { ts: number; data: any };
+const MEMORY_CACHE = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 1000 * 60 * 5;
+
+const readCache = (key: string) => {
+  const entry = MEMORY_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    MEMORY_CACHE.delete(key);
+    return null;
+  }
+  return entry.data;
+};
+
+const writeCache = (key: string, data: any) => {
+  MEMORY_CACHE.set(key, { ts: Date.now(), data });
+};
+
 const getDevHost = () => {
   const hostUri =
     Constants.expoConfig?.hostUri ||
@@ -73,11 +91,19 @@ export const getForecast = async (steps = 6) => {
 };
 
 export const getSoilZones = async () => {
+  const cacheKey = 'soil-zones';
+  const cached = readCache(cacheKey);
+  if (cached) return cached;
   const res = await api.get('/soil-zones');
+  writeCache(cacheKey, res.data);
   return res.data;
 };
 
 export const predictBySubCounty = async (data: { sub_county: string; season?: string | number }) => {
+  const cacheKey = `predict-sub-county:${data.sub_county}:${data.season ?? ''}`;
+  const cached = readCache(cacheKey);
+  if (cached) return JSON.parse(JSON.stringify(cached));
   const res = await api.post('/predict/sub-county', data);
+  writeCache(cacheKey, res.data);
   return res.data;
 };

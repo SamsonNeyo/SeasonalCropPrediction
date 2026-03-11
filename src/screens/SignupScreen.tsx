@@ -413,15 +413,6 @@ const createStyles = (colors: any) =>
       textAlign: 'center',
       fontSize: TYPE.tiny,
     },
-    brand: {
-      fontFamily: FONT_FAMILY,
-      marginTop: 10,
-      textAlign: 'center',
-      color: colors.secondary,
-      fontWeight: WEIGHT.semibold,
-      letterSpacing: 1,
-      fontSize: TYPE.caption,
-    },
     bgOrbOne: {
       position: 'absolute',
       width: 240,

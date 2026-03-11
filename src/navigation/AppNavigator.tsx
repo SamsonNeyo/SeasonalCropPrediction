@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { FONT_FAMILY } from '../constants/typography';
 
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -67,6 +68,7 @@ const MainTabs = () => {
           lineHeight: 12,
           marginTop: 2,
           marginBottom: 2,
+          fontFamily: FONT_FAMILY,
         },
         tabBarIcon: ({ color, size, focused }) => {
           let iconName = 'home-variant-outline';

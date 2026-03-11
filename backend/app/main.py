@@ -7,8 +7,10 @@ from dotenv import load_dotenv
 from .openai_client import chat_with_openai, OpenAIError
 import time
 from .forecast_model import build_forecast, ensure_models
-from .soil_mapping import detect_soil_zone, list_soil_zones, get_sub_county_profile, get_preferred_crops, get_crop_catalog
+from .soil_mapping import detect_soil_zone, list_soil_zones, get_sub_county_profile, get_crop_catalog
 from datetime import datetime
+from functools import lru_cache
+import copy
 
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(ENV_PATH)
@@ -86,6 +88,55 @@ def _season_defaults(season: str) -> dict:
     return {"temperature": 25.0, "rainfall": 120.0}
 
 
+@lru_cache(maxsize=128)
+def _cached_sub_county_response(sub_county_key: str, season_value: str) -> dict | None:
+    profile = get_sub_county_profile(sub_county_key)
+    if not profile:
+        return None
+    defaults = profile.get("first") if season_value == "First" else profile.get("second")
+    if not defaults:
+        defaults = _season_defaults(season_value)
+    soil_type = profile["soil_type"]
+
+    preferred_crops = profile.get("preferred_crops") or ["Maize", "Beans", "Cassava", "Groundnuts"]
+
+    base_score = 0.93
+    recommendations = []
+    for crop in preferred_crops[:8]:
+        score = max(base_score, 0.45)
+        recommendations.append(
+            {
+                "crop": crop,
+                "confidence": round(score * 100, 1),
+                "confidence_score": round(score, 4),
+                "source": "sub_county_profile",
+                "explanation": explanations.get(crop, "Commonly grown in this sub-county."),
+            }
+        )
+        base_score -= 0.07
+
+    recommendations = _add_planning_to_recommendations(recommendations, season_value)
+    top = recommendations[0] if recommendations else {"crop": None, "confidence_score": 0.0}
+    season_context = _season_context(season_value)
+    return {
+        "recommended_crop": top["crop"],
+        "confidence": top["confidence_score"],
+        "recommendations": recommendations,
+        "season_advice": {
+            **season_context,
+            "harvest_readiness": "Arrange labor, storage, and buyers at least 2-3 weeks before expected harvest.",
+            "focus": "Use sub-county crop priorities and season timing to schedule planting and harvest decisions.",
+        },
+        "inputs": {
+            "sub_county": profile["sub_county"],
+            "season": season_value,
+            "soil_type": soil_type,
+            "temperature": defaults["temperature"],
+            "rainfall": defaults["rainfall"],
+        },
+    }
+
+
 @app.get("/forecast")
 async def forecast(steps: int = 6):
     if steps < 1 or steps > 24:
@@ -110,58 +161,13 @@ async def crop_catalog():
 
 @app.post("/predict/sub-county")
 async def predict_by_sub_county(request: SubCountyPredictionRequest):
-    profile = get_sub_county_profile(request.sub_county)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Sub-county not found in mapping table.")
-
     season = request.season if request.season is not None else _season_from_date()
     season_value = "First" if str(season).strip().lower() in {"1", "first", "first season"} else "Second"
-    defaults = profile.get("first") if season_value == "First" else profile.get("second")
-    if not defaults:
-        defaults = _season_defaults(season_value)
-    soil_type = profile["soil_type"]
-
-    preferred_crops = get_preferred_crops(request.sub_county)
-    if not preferred_crops:
-        preferred_crops = ["Maize", "Beans", "Cassava", "Groundnuts"]
-
-    # Recommendations here are strictly sub-county profile driven.
-    base_score = 0.93
-    recommendations = []
-    for crop in preferred_crops[:8]:
-        score = max(base_score, 0.45)
-        recommendations.append(
-            {
-                "crop": crop,
-                "confidence": round(score * 100, 1),
-                "confidence_score": round(score, 4),
-                "source": "sub_county_profile",
-                "explanation": explanations.get(crop, "Commonly grown in this sub-county."),
-            }
-        )
-        base_score -= 0.07
-
-    recommendations = _add_planning_to_recommendations(recommendations, season_value)
-
-    top = recommendations[0] if recommendations else {"crop": None, "confidence_score": 0.0}
-    season_context = _season_context(season_value)
-    return {
-        "recommended_crop": top["crop"],
-        "confidence": top["confidence_score"],
-        "recommendations": recommendations,
-        "season_advice": {
-            **season_context,
-            "harvest_readiness": "Arrange labor, storage, and buyers at least 2-3 weeks before expected harvest.",
-            "focus": "Use sub-county crop priorities and season timing to schedule planting and harvest decisions.",
-        },
-        "inputs": {
-            "sub_county": request.sub_county,
-            "season": season_value,
-            "soil_type": soil_type,
-            "temperature": defaults["temperature"],
-            "rainfall": defaults["rainfall"],
-        },
-    }
+    cache_key = request.sub_county.strip().lower()
+    cached = _cached_sub_county_response(cache_key, season_value)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Sub-county not found in mapping table.")
+    return copy.deepcopy(cached)
 
 
 @app.post("/chat")

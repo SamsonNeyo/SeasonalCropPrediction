@@ -255,7 +255,6 @@ const createStyles = (colors: any) =>
       height: 96,
       marginBottom: 12,
     },
-    brandName: { fontFamily: FONT_FAMILY, fontSize: TYPE.h3, fontWeight: WEIGHT.bold, color: colors.primary, marginBottom: 6 },
     title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
     subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 6, textAlign: 'center' },
     pill: {
@@ -429,15 +428,6 @@ const createStyles = (colors: any) =>
       fontSize: TYPE.tiny,
     },
     linkInline: { fontFamily: FONT_FAMILY, color: colors.secondary, fontSize: TYPE.caption },
-    brand: {
-      fontFamily: FONT_FAMILY,
-      marginTop: 12,
-      textAlign: 'center',
-      color: colors.secondary,
-      fontWeight: WEIGHT.semibold,
-      letterSpacing: 1,
-      fontSize: TYPE.caption,
-    },
     bgOrbOne: {
       position: 'absolute',
       width: 240,
