@@ -11,24 +11,17 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
-
-const HIGHLIGHTS = [
-  { icon: 'map-marker-radius-outline', label: 'Sub-county based recommendations' },
-  { icon: 'weather-partly-cloudy', label: 'Season-focused planning for Luwero' },
-  { icon: 'history', label: 'Save and review your prediction history' },
-];
 
 const WelcomeScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const cardIn = useRef(new Animated.Value(0)).current;
+  const contentIn = useRef(new Animated.Value(0)).current;
   const bgFloat = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(cardIn, {
+    Animated.timing(contentIn, {
       toValue: 1,
       duration: 700,
       easing: Easing.out(Easing.cubic),
@@ -51,13 +44,13 @@ const WelcomeScreen = ({ navigation }: any) => {
         }),
       ])
     ).start();
-  }, [cardIn, bgFloat]);
+  }, [contentIn, bgFloat]);
 
-  const cardTranslate = cardIn.interpolate({
+  const contentTranslate = contentIn.interpolate({
     inputRange: [0, 1],
     outputRange: [16, 0],
   });
-  const cardScale = cardIn.interpolate({
+  const contentScale = contentIn.interpolate({
     inputRange: [0, 1],
     outputRange: [0.98, 1],
   });
@@ -73,56 +66,30 @@ const WelcomeScreen = ({ navigation }: any) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Animated.View
           style={[
-            styles.card,
-            { opacity: cardIn, transform: [{ translateY: cardTranslate }, { scale: cardScale }] },
+            styles.panel,
+            { opacity: contentIn, transform: [{ translateY: contentTranslate }, { scale: contentScale }] },
           ]}
         >
-          <View style={styles.topAccentBar} />
+          <View pointerEvents="none" style={styles.cornerTopLeft} />
+          <View pointerEvents="none" style={styles.cornerBottomRight} />
+          <View style={styles.panelAccent} />
           <View style={styles.brandColumn}>
             <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
+            <Text style={styles.eyebrow}>Smart farming assistant</Text>
             <Text style={styles.title}>SmartCrop</Text>
-            <View style={styles.pill}>
-              <Text style={styles.pillText}>Luwero Crop Planner</Text>
-            </View>
           </View>
-          <Text style={styles.subtitle}>Plan smarter before you plant</Text>
-          <Text style={styles.description}>
-            Get practical crop recommendations based on your selected sub-county and current planting season.
-          </Text>
+          <Text style={styles.subtitle}>Crop planning for Luwero District.</Text>
+          <Text style={styles.description}>Sign in to access recommendations, analysis, and farm history.</Text>
 
-          <View style={styles.highlightList}>
-            {HIGHLIGHTS.map((item) => (
-              <View key={item.label} style={styles.highlightRow}>
-                <View style={styles.highlightIcon}>
-                  <MaterialCommunityIcons name={item.icon as any} size={15} color={colors.secondary} />
-                </View>
-                <Text style={styles.highlightText}>{item.label}</Text>
-              </View>
-            ))}
+          <View style={styles.actions}>
+            <Pressable style={styles.primaryButton} onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.primaryButtonText}>Sign In</Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Signup')}>
+              <Text style={styles.secondaryButtonText}>Create Account</Text>
+            </Pressable>
           </View>
-
-          <Pressable
-            style={({ hovered, pressed }) => [
-              styles.primaryButton,
-              hovered && styles.primaryButtonHover,
-              pressed && styles.primaryButtonPressed,
-            ]}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <Text style={styles.primaryButtonText}>Sign In</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ hovered, pressed }) => [
-              styles.secondaryButton,
-              hovered && styles.secondaryButtonHover,
-              pressed && styles.secondaryButtonPressed,
-            ]}
-            onPress={() => navigation.navigate('Signup')}
-          >
-            <Text style={styles.secondaryButtonText}>Create Account</Text>
-          </Pressable>
-          <Text style={styles.footerNote}>For farmers and agribusiness users in and around Luwero District.</Text>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
@@ -142,37 +109,72 @@ const createStyles = (colors: any) =>
     padding: 24,
     paddingVertical: 20,
   },
-  card: {
+  panel: {
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 460 : undefined,
     backgroundColor: colors.glass,
-    borderRadius: 18,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: colors.glassBorder,
-    padding: 20,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    paddingHorizontal: 24,
+    paddingVertical: 26,
     alignSelf: 'center',
-    overflow: 'hidden',
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4,
   },
-  topAccentBar: {
-    height: 5,
-    borderRadius: 4,
+  panelAccent: {
+    width: 56,
+    height: 4,
+    borderRadius: 999,
     backgroundColor: colors.accent,
-    marginBottom: 14,
+    alignSelf: 'center',
+    marginBottom: 18,
+    opacity: 0.9,
+  },
+  cornerTopLeft: {
+    position: 'absolute',
+    top: 18,
+    left: 18,
+    width: 26,
+    height: 26,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: colors.primary,
+    borderTopLeftRadius: 14,
+    opacity: 0.9,
+  },
+  cornerBottomRight: {
+    position: 'absolute',
+    right: 18,
+    bottom: 18,
+    width: 26,
+    height: 26,
+    borderBottomWidth: 2,
+    borderRightWidth: 2,
+    borderColor: colors.primary,
+    borderBottomRightRadius: 14,
     opacity: 0.9,
   },
   brandColumn: {
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   logo: {
-    width: 96,
-    height: 96,
-    marginBottom: 12,
+    width: 92,
+    height: 92,
+    marginBottom: 14,
+  },
+  eyebrow: {
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.caption,
+    fontWeight: WEIGHT.semibold,
+    color: colors.secondary,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
   title: {
     fontFamily: FONT_FAMILY,
@@ -184,50 +186,22 @@ const createStyles = (colors: any) =>
   },
   subtitle: {
     fontFamily: FONT_FAMILY,
-    fontSize: TYPE.bodySmall,
+    fontSize: TYPE.body,
     fontWeight: WEIGHT.semibold,
-    color: colors.lightText,
+    color: colors.text,
     marginBottom: 8,
     textAlign: 'center',
   },
   description: {
     fontFamily: FONT_FAMILY,
     fontSize: TYPE.bodySmall,
-    color: colors.text,
-    marginBottom: 14,
-    lineHeight: 20,
+    color: colors.lightText,
+    marginBottom: 28,
+    lineHeight: 21,
     textAlign: 'center',
   },
-  highlightList: {
-    marginBottom: 18,
-    gap: 8,
-  },
-  highlightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    backgroundColor: colors.surfaceAlt,
-  },
-  highlightIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-    overflow: 'hidden',
-  },
-  highlightText: {
-    flex: 1,
-    fontFamily: FONT_FAMILY,
-    color: colors.text,
-    fontSize: TYPE.caption,
-    fontWeight: WEIGHT.semibold,
+  actions: {
+    width: '100%',
   },
   primaryButton: {
     width: '100%',
@@ -236,14 +210,6 @@ const createStyles = (colors: any) =>
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
-  },
-  primaryButtonHover: {
-    opacity: 0.93,
-    transform: [{ translateY: -1 }],
-  },
-  primaryButtonPressed: {
-    opacity: 0.85,
-    transform: [{ translateY: 0 }],
   },
   primaryButtonText: {
     fontFamily: FONT_FAMILY,
@@ -260,36 +226,12 @@ const createStyles = (colors: any) =>
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
   },
-  secondaryButtonHover: {
-    backgroundColor: colors.pillBg,
-  },
-  secondaryButtonPressed: {
-    opacity: 0.88,
-  },
   secondaryButtonText: {
     fontFamily: FONT_FAMILY,
     color: colors.primary,
     fontSize: TYPE.body,
     fontWeight: WEIGHT.semibold,
   },
-  footerNote: {
-    marginTop: 12,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.tiny,
-    color: colors.lightText,
-    textAlign: 'center',
-  },
-  pill: {
-    alignSelf: 'center',
-    backgroundColor: colors.pillBg,
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    marginTop: 6,
-  },
-  pillText: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.secondary, fontWeight: WEIGHT.semibold },
   bgLeaf: {
     position: 'absolute',
     width: 280,

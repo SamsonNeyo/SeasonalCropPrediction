@@ -11,6 +11,7 @@ import {
   Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useScrollToTop } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getAIAdvice } from '../services/openai';
@@ -33,6 +34,9 @@ const AIAdvisorScreen = () => {
   const [loading, setLoading] = useState(false);
   const headerIn = useRef(new Animated.Value(0)).current;
   const cardIn = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
+
+  useScrollToTop(scrollRef);
 
   useEffect(() => {
     Animated.stagger(120, [
@@ -82,7 +86,7 @@ const AIAdvisorScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View
           style={[
             styles.header,

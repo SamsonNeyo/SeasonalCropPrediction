@@ -14,6 +14,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useScrollToTop } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
@@ -37,8 +38,13 @@ const HistoryScreen = () => {
   const [filterYear, setFilterYear] = useState<number | 'all'>('all');
   const [filterSeason, setFilterSeason] = useState<'all' | 'First' | 'Second'>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const headerIn = useRef(new Animated.Value(0)).current;
   const listIn = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
+
+  useScrollToTop(scrollRef);
 
   const loadHistory = async () => {
     try {
@@ -63,8 +69,18 @@ const HistoryScreen = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteHistoryItem(id);
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    try {
+      await deleteHistoryItem(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    } catch (e: any) {
+      const msg = e?.code || e?.message || 'Delete failed.';
+      setError(`Could not delete history: ${msg}`);
+    }
+  };
+
+  const confirmDelete = (id: string) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
   };
 
   const handleRefresh = async () => {
@@ -175,6 +191,7 @@ const HistoryScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -313,7 +330,7 @@ const HistoryScreen = () => {
                     {item.soil_type || 'Mapped soil'} - {item.temperature ?? '-'} C - {item.rainfall ?? '-'} mm
                   </Text>
                 </View>
-                  <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
+                  <TouchableOpacity onPress={() => confirmDelete(item.id)} style={styles.deleteBtn}>
                     <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.error} />
                   </TouchableOpacity>
                 </View>
@@ -380,6 +397,22 @@ const HistoryScreen = () => {
         }}
         styles={styles}
         colors={colors}
+      />
+      <ConfirmModal
+        visible={confirmOpen}
+        title="Delete history item?"
+        message="Do you want to delete this record?"
+        onCancel={() => {
+          setConfirmOpen(false);
+          setPendingDeleteId(null);
+        }}
+        onConfirm={() => {
+          if (!pendingDeleteId) return;
+          handleDelete(pendingDeleteId);
+          setConfirmOpen(false);
+          setPendingDeleteId(null);
+        }}
+        styles={styles}
       />
     </SafeAreaView>
   );
@@ -464,6 +497,42 @@ const SelectModal = ({
             ListEmptyComponent={<Text style={styles.modalEmpty}>No options available.</Text>}
           />
         </Animated.View>
+      </View>
+    </Modal>
+  );
+};
+
+const ConfirmModal = ({
+  visible,
+  title,
+  message,
+  onCancel,
+  onConfirm,
+  styles,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  styles: any;
+}) => {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.confirmOverlay}>
+        <Pressable style={styles.confirmBackdrop} onPress={onCancel} />
+        <View style={styles.confirmCard}>
+          <Text style={styles.confirmTitle}>{title}</Text>
+          <Text style={styles.confirmText}>{message}</Text>
+          <View style={styles.confirmActions}>
+            <TouchableOpacity style={styles.confirmButton} onPress={onCancel}>
+              <Text style={styles.confirmButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.confirmButton, styles.confirmDeleteButton]} onPress={onConfirm}>
+              <Text style={[styles.confirmButtonText, styles.confirmDeleteText]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </Modal>
   );
@@ -724,6 +793,66 @@ const createStyles = (colors: any) =>
     textAlign: 'center',
     paddingVertical: 12,
     fontSize: TYPE.bodySmall,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  confirmBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.glass,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: 16,
+  },
+  confirmTitle: {
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.body,
+    fontWeight: WEIGHT.bold,
+    color: colors.secondary,
+  },
+  confirmText: {
+    marginTop: 6,
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.bodySmall,
+    color: colors.lightText,
+    lineHeight: 20,
+  },
+  confirmActions: {
+    marginTop: 14,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmButton: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glassSoft,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDeleteButton: {
+    backgroundColor: colors.error,
+    borderColor: colors.error,
+  },
+  confirmButtonText: {
+    fontFamily: FONT_FAMILY,
+    fontSize: TYPE.caption,
+    fontWeight: WEIGHT.semibold,
+    color: colors.secondary,
+  },
+  confirmDeleteText: {
+    color: colors.white,
   },
 });
 

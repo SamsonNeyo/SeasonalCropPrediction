@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useScrollToTop } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { predictBySubCounty } from '../services/api';
@@ -54,6 +55,9 @@ const HomeScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const actionIn = useRef(new Animated.Value(0)).current;
   const listIn = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
+
+  useScrollToTop(scrollRef);
 
   const seasonValue = useMemo(() => getCurrentSeason(), []);
   const todayLabel = useMemo(() => formatDate(new Date()), []);
@@ -197,8 +201,8 @@ const HomeScreen = () => {
       }
     } catch (e: any) {
       setError(e?.message || 'Could not load seasonal recommendations.');
-      setRecommendations((prev) => (prev?.length ? prev : []));
-      setSeasonAdvice((prev) => prev || null);
+      setRecommendations((prev: any[]) => (prev?.length ? prev : []));
+      setSeasonAdvice((prev: any) => prev || null);
     } finally {
       setLoading(false);
     }
@@ -237,6 +241,7 @@ const HomeScreen = () => {
       <View style={styles.bgAccent} />
       <Animated.View style={[styles.content, { opacity: listIn }]}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.pageScrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -339,7 +344,7 @@ const HomeScreen = () => {
             </View>
             <Text style={styles.todayActionText}>{seasonAction}</Text>
             <View style={styles.todayActionDivider} />
-            <View style={styles.riskRow}>
+          <View style={styles.riskRow}>
               {riskChips.map((chip, idx) => (
                 <View
                   key={`${chip.label}-${idx}`}
@@ -348,7 +353,18 @@ const HomeScreen = () => {
                     chip.tone === 'high' ? styles.riskChipHigh : chip.tone === 'medium' ? styles.riskChipMedium : styles.riskChipLow,
                   ]}
                 >
-                  <Text style={styles.riskChipText}>{chip.label}</Text>
+                  <Text
+                    style={[
+                      styles.riskChipText,
+                      chip.tone === 'high'
+                        ? styles.riskChipTextHigh
+                        : chip.tone === 'medium'
+                          ? styles.riskChipTextMedium
+                          : null,
+                    ]}
+                  >
+                    {chip.label}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -444,6 +460,12 @@ const createStyles = (colors: any, isDark: boolean) => {
   const weatherTextPrimary = isDark ? '#E9F1EC' : '#F4FAF6';
   const weatherTextMuted = isDark ? '#BFD5C9' : '#D6E8DD';
   const weatherDividerColor = isDark ? '#1C3528' : '#2A6F49';
+  const riskHighBg = isDark ? '#4A1F1C' : '#F9E6E3';
+  const riskHighBorder = isDark ? '#7A2E2A' : '#E6B1A8';
+  const riskHighText = isDark ? '#F6D6D2' : colors.text;
+  const riskMediumBg = isDark ? '#3B2D13' : '#F3EEE2';
+  const riskMediumBorder = isDark ? '#6A5320' : '#D8C59A';
+  const riskMediumText = isDark ? '#F3E3BA' : colors.text;
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     content: { flex: 1, padding: 16, paddingBottom: 10 },
@@ -715,18 +737,24 @@ const createStyles = (colors: any, isDark: boolean) => {
       borderColor: colors.pillBorder,
     },
     riskChipMedium: {
-      backgroundColor: '#F3EEE2',
-      borderColor: '#D8C59A',
+      backgroundColor: riskMediumBg,
+      borderColor: riskMediumBorder,
     },
     riskChipHigh: {
-      backgroundColor: '#F9E6E3',
-      borderColor: '#E6B1A8',
+      backgroundColor: riskHighBg,
+      borderColor: riskHighBorder,
     },
     riskChipText: {
       color: colors.text,
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.tiny,
       fontWeight: WEIGHT.semibold,
+    },
+    riskChipTextHigh: {
+      color: riskHighText,
+    },
+    riskChipTextMedium: {
+      color: riskMediumText,
     },
     seasonPlanTop: {
       flexDirection: 'row',

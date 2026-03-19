@@ -33,7 +33,7 @@ const getWebHost = () => {
   return window.location?.hostname || '';
 };
 
-export const API_BASE = (() => {
+const API_BASE = (() => {
   const envBase = process.env.EXPO_PUBLIC_API_BASE;
   if (envBase) return envBase;
 
@@ -61,34 +61,6 @@ export const api = axios.create({
   baseURL: API_BASE,
   timeout: 40000,
 });
-
-export const predictCrops = async (data: {
-  season: string | number;
-  soil_type: string;
-  temperature: number;
-  rainfall: number;
-}) => {
-  const res = await api.post('/predict', data);
-  return res.data;
-};
-
-export const searchCrop = async (
-  data: { season: string; soil_type: string; temperature: number; rainfall: number },
-  crop: string
-) => {
-  const res = await api.post(`/predict/search?crop=${encodeURIComponent(crop)}`, data);
-  return res.data;
-};
-
-export const detectSoilType = async (data: { latitude: number; longitude: number }) => {
-  const res = await api.post('/detect-soil', data);
-  return res.data;
-};
-
-export const getForecast = async (steps = 6) => {
-  const res = await api.get(`/forecast?steps=${steps}`);
-  return res.data;
-};
 
 export const getSoilZones = async () => {
   const cacheKey = 'soil-zones';

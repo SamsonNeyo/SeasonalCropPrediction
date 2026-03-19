@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useScrollToTop } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,7 +26,7 @@ import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
 import { useAuth } from '../context/AuthContext';
 import { getSoilZones } from '../services/api';
 
-const ProfileScreen = ({ navigation }: any) => {
+const ProfileScreen = () => {
   const { colors, isDark, setDarkMode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, userData, logout, updateUserData } = useAuth();
@@ -47,6 +48,9 @@ const ProfileScreen = ({ navigation }: any) => {
   const headerIn = useRef(new Animated.Value(0)).current;
   const cardIn = useRef(new Animated.Value(0)).current;
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useScrollToTop(scrollRef);
 
   const displayName = useMemo(() => name || user?.email?.split('@')[0] || 'Farmer', [name, user?.email]);
 
@@ -252,7 +256,7 @@ const ProfileScreen = ({ navigation }: any) => {
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'SmartCrop weather alert',
-        body: 'Check today weather forecast for heavy rain or dry spell risks.',
+        body: 'Check today\'s weather for heavy rain or dry spell risks.',
       },
       trigger:
         Platform.OS === 'android'
@@ -284,7 +288,7 @@ const ProfileScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Animated.View
         style={[
           styles.header,
@@ -566,19 +570,6 @@ const ProfileScreen = ({ navigation }: any) => {
           />
         </View>
 
-        <View style={styles.manualBlock}>
-          <View style={styles.manualHeader}>
-            <MaterialCommunityIcons name="map-search-outline" size={18} color={colors.secondary} />
-            <Text style={styles.manualTitle}>Manual Analysis</Text>
-          </View>
-          <Text style={styles.mutedSmall}>
-            Run manual analysis anytime for your preferred Luwero sub-county.
-          </Text>
-          <TouchableOpacity style={styles.manualButton} onPress={() => navigation.navigate('ManualAnalysis')}>
-            <MaterialCommunityIcons name="arrow-right-circle-outline" size={17} color={colors.white} />
-            <Text style={styles.manualButtonText}>Open Manual Analysis</Text>
-          </TouchableOpacity>
-        </View>
       </Animated.View>
 
       {!!error && <Text style={styles.error}>{error}</Text>}
@@ -780,42 +771,6 @@ const createStyles = (colors: any) =>
     borderBottomColor: colors.border,
   },
   settingText: { flex: 1, paddingRight: 12 },
-  manualBlock: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 12,
-    backgroundColor: colors.glassSoft,
-    padding: 10,
-  },
-  manualHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  manualTitle: {
-    marginLeft: 7,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.bodySmall,
-    color: colors.secondary,
-    fontWeight: WEIGHT.semibold,
-  },
-  manualButton: {
-    marginTop: 8,
-    borderRadius: 10,
-    backgroundColor: colors.secondary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    gap: 6,
-  },
-  manualButtonText: {
-    fontFamily: FONT_FAMILY,
-    color: colors.white,
-    fontSize: TYPE.caption,
-    fontWeight: WEIGHT.semibold,
-  },
   field: { marginBottom: 12 },
   fieldLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 6 },
   input: {

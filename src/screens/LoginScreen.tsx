@@ -22,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 const LoginScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { login, loginWithGoogle, resetPassword } = useAuth();
+  const { login, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -88,20 +88,6 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      setError('');
-      setInfo('');
-      setLoading(true);
-      await loginWithGoogle();
-    } catch (e: any) {
-      if (String(e?.message || '').toLowerCase().includes('cancel')) return;
-      setError(e?.message || 'Google sign-in failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const disableLogin = loading || !email.trim() || !password;
 
   return (
@@ -111,31 +97,7 @@ const LoginScreen = ({ navigation }: any) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Animated.View
           style={[
-            styles.header,
-            {
-              opacity: headerIn,
-              transform: [
-                {
-                  translateY: headerIn.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [14, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>Luwero Farming Assistant</Text>
-          </View>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to view seasonal recommendations and farm history.</Text>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.card,
+            styles.panel,
             {
               opacity: cardIn,
               transform: [
@@ -149,10 +111,31 @@ const LoginScreen = ({ navigation }: any) => {
             },
           ]}
         >
-          <View style={styles.sectionIntro}>
-            <MaterialCommunityIcons name="account-check-outline" size={16} color={colors.secondary} />
-            <Text style={styles.sectionIntroText}>Use your SmartCrop account details</Text>
-          </View>
+          <View pointerEvents="none" style={styles.cornerTopLeft} />
+          <View pointerEvents="none" style={styles.cornerBottomRight} />
+          <View style={styles.panelAccent} />
+          <Animated.View
+            style={[
+              styles.header,
+              {
+                opacity: headerIn,
+                transform: [
+                  {
+                    translateY: headerIn.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [14, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
+            <Text style={styles.eyebrow}>SmartCrop</Text>
+            <Text style={styles.title}>Sign In</Text>
+            <Text style={styles.subtitle}>Access your account to continue.</Text>
+          </Animated.View>
+
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -206,27 +189,10 @@ const LoginScreen = ({ navigation }: any) => {
           >
             {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Sign In</Text>}
           </TouchableOpacity>
-          <Pressable
-            style={({ hovered, pressed }) => [
-              styles.googleButton,
-              hovered && styles.googleButtonHover,
-              pressed && styles.googleButtonPressed,
-              loading && styles.googleButtonDisabled,
-            ]}
-            android_ripple={{ color: '#E8EAED' }}
-            onPress={handleGoogleLogin}
-            disabled={loading}
-          >
-            <View style={styles.googleIconWrap}>
-              <MaterialCommunityIcons name="google" size={18} color="#4285F4" />
-            </View>
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </Pressable>
 
           <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
             <Text style={styles.link}>New here? Create an account</Text>
           </TouchableOpacity>
-          <Text style={styles.footerNote}>Secure sign-in for your crop planning profile.</Text>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
@@ -246,66 +212,75 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
-    header: {
-      alignItems: 'center',
-      marginBottom: 20,
-    },
-    logo: {
-      width: 96,
-      height: 96,
-      marginBottom: 12,
-    },
-    title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
-    subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 6, textAlign: 'center' },
-    pill: {
-      alignSelf: 'center',
-      backgroundColor: colors.pillBg,
-      borderWidth: 1,
-      borderColor: colors.pillBorder,
-      paddingVertical: 4,
-      paddingHorizontal: 10,
-      borderRadius: 999,
-      marginBottom: 8,
-    },
-    pillText: {
-      fontFamily: FONT_FAMILY,
-      color: colors.secondary,
-      fontSize: TYPE.caption,
-      fontWeight: WEIGHT.semibold,
-    },
-    card: {
+    panel: {
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 420 : undefined,
       backgroundColor: colors.glass,
-      borderRadius: 16,
+      borderRadius: 24,
       borderWidth: 1,
       borderColor: colors.glassBorder,
-      padding: 18,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.14,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 3,
+      paddingHorizontal: 22,
+      paddingVertical: 24,
       alignSelf: 'center',
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 4,
     },
-    sectionIntro: {
-      flexDirection: 'row',
+    panelAccent: {
+      width: 48,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: colors.accent,
+      alignSelf: 'center',
+      marginBottom: 18,
+      opacity: 0.9,
+    },
+    cornerTopLeft: {
+      position: 'absolute',
+      top: 18,
+      left: 18,
+      width: 26,
+      height: 26,
+      borderTopWidth: 2,
+      borderLeftWidth: 2,
+      borderColor: colors.primary,
+      borderTopLeftRadius: 14,
+      opacity: 0.9,
+    },
+    cornerBottomRight: {
+      position: 'absolute',
+      right: 18,
+      bottom: 18,
+      width: 26,
+      height: 26,
+      borderBottomWidth: 2,
+      borderRightWidth: 2,
+      borderColor: colors.primary,
+      borderBottomRightRadius: 14,
+      opacity: 0.9,
+    },
+    header: {
       alignItems: 'center',
-      marginBottom: 10,
-      backgroundColor: colors.glassSoft,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      borderRadius: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 10,
+      marginBottom: 28,
     },
-    sectionIntroText: {
-      marginLeft: 7,
+    logo: {
+      width: 84,
+      height: 84,
+      marginBottom: 12,
+    },
+    eyebrow: {
       fontFamily: FONT_FAMILY,
       color: colors.secondary,
       fontSize: TYPE.caption,
       fontWeight: WEIGHT.semibold,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      marginBottom: 6,
     },
+    title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
+    subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 6, textAlign: 'center' },
     input: {
       borderWidth: 1,
       borderColor: colors.glassBorder,
@@ -351,9 +326,9 @@ const createStyles = (colors: any) =>
       height: 20,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.glassBorder,
       marginRight: 8,
-      backgroundColor: colors.card,
+      backgroundColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -377,56 +352,7 @@ const createStyles = (colors: any) =>
     },
     primaryButtonDisabled: { backgroundColor: '#9DBA9D' },
     primaryButtonText: { fontFamily: FONT_FAMILY, color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body },
-    link: { fontFamily: FONT_FAMILY, color: colors.secondary, marginTop: 12, textAlign: 'center', fontSize: TYPE.bodySmall },
-    googleButton: {
-      marginTop: 10,
-      borderWidth: 1,
-      borderColor: '#DADCE0',
-      backgroundColor: '#FFFFFF',
-      borderRadius: 12,
-      minHeight: 48,
-      paddingVertical: 11,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'row',
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 1,
-    },
-    googleButtonHover: {
-      backgroundColor: '#F8FAFD',
-      borderColor: '#C6DAFC',
-    },
-    googleButtonPressed: {
-      backgroundColor: '#F1F3F4',
-    },
-    googleButtonDisabled: {
-      opacity: 0.65,
-    },
-    googleIconWrap: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 8,
-    },
-    googleButtonText: {
-      fontFamily: FONT_FAMILY,
-      color: '#1F1F1F',
-      fontSize: TYPE.bodySmall,
-      fontWeight: WEIGHT.semibold,
-      letterSpacing: 0.2,
-    },
-    footerNote: {
-      fontFamily: FONT_FAMILY,
-      color: colors.lightText,
-      marginTop: 10,
-      textAlign: 'center',
-      fontSize: TYPE.tiny,
-    },
+    link: { fontFamily: FONT_FAMILY, color: colors.secondary, marginTop: 14, textAlign: 'center', fontSize: TYPE.bodySmall },
     linkInline: { fontFamily: FONT_FAMILY, color: colors.secondary, fontSize: TYPE.caption },
     bgOrbOne: {
       position: 'absolute',

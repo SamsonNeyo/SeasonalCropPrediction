@@ -17,7 +17,6 @@ import ManualAnalysisScreen from '../screens/ManualAnalysisScreen';
 import AIAdvisorScreen from '../screens/AIAdvisorScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import ForecastScreen from '../screens/ForecastScreen';
 import ProfileSetupScreen from '../screens/ProfileSetupScreen';
 
 const Stack = createNativeStackNavigator();
@@ -71,10 +70,10 @@ const MainTabs = () => {
           fontFamily: FONT_FAMILY,
         },
         tabBarIcon: ({ color, size, focused }) => {
-          let iconName = 'home-variant-outline';
+          let iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] = 'home-variant-outline';
           if (route.name === 'Home') iconName = 'home-variant-outline';
           if (route.name === 'AI') iconName = 'brain';
-          if (route.name === 'Forecast') iconName = 'chart-line';
+          if (route.name === 'Manual') iconName = 'clipboard-edit-outline';
           if (route.name === 'History') iconName = 'history';
           if (route.name === 'Profile') iconName = 'account-circle-outline';
           const wrapperStyle = [styles.iconWrap, focused && styles.iconWrapFocused];
@@ -89,7 +88,7 @@ const MainTabs = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="AI" component={AIAdvisorScreen} options={{ title: 'AI Advisor' }} />
-      <Tab.Screen name="Forecast" component={ForecastScreen} />
+      <Tab.Screen name="Manual" component={ManualAnalysisScreen} options={{ title: 'Manual Analysis' }} />
       <Tab.Screen name="History" component={HistoryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -167,7 +166,6 @@ const AppNavigator = () => {
         ) : (
           <>
             <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="ManualAnalysis" component={ManualAnalysisScreen} />
           </>
         )}
       </Stack.Navigator>

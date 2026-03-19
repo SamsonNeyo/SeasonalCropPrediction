@@ -9,7 +9,7 @@ import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 
 type Zone = { sub_county: string; soil_type: string };
 
-const ManualAnalysisScreen = ({ navigation }: any) => {
+const ManualAnalysisScreen = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -211,17 +211,6 @@ const ManualAnalysisScreen = ({ navigation }: any) => {
           )}
         </View>
       </ScrollView>
-      <View style={styles.bottomNavBar}>
-        <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={16} color={colors.primary} />
-          <Text style={styles.topNavBtnText}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.topNavBtn} onPress={() => navigation.navigate('Main')}>
-          <MaterialCommunityIcons name="home-outline" size={16} color={colors.primary} />
-          <Text style={styles.topNavBtnText}>Home</Text>
-        </TouchableOpacity>
-      </View>
-
       <Modal visible={subCountyOpen} transparent animationType="fade" onRequestClose={() => setSubCountyOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setSubCountyOpen(false)}>
           <View style={styles.modalCard}>
@@ -260,35 +249,7 @@ const ManualAnalysisScreen = ({ navigation }: any) => {
 const createStyles = (colors: any) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 16, paddingBottom: 104 },
-    bottomNavBar: {
-      position: 'absolute',
-      left: 16,
-      right: 16,
-      bottom: 12,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 10,
-      zIndex: 10,
-    },
-    topNavBtn: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 10,
-      backgroundColor: colors.card,
-      paddingVertical: 9,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-    },
-    topNavBtnText: {
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.caption,
-      color: colors.primary,
-      fontWeight: WEIGHT.semibold,
-    },
+    content: { padding: 16, paddingBottom: 24 },
     header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
     headerIcon: {
       width: 40,
@@ -334,29 +295,6 @@ const createStyles = (colors: any) =>
       marginBottom: 8,
     },
     cardText: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, lineHeight: 20, color: colors.text },
-    weatherRow: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    weatherPill: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      borderRadius: 12,
-      paddingVertical: 10,
-      paddingHorizontal: 10,
-      backgroundColor: colors.glassSoft,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-    },
-    weatherText: {
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.caption,
-      color: colors.text,
-      fontWeight: WEIGHT.semibold,
-    },
     selectField: {
       borderWidth: 1,
       borderColor: colors.glassBorder,
