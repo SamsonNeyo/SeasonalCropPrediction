@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { getSoilZones } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 

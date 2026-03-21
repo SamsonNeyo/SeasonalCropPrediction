@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useScrollToTop } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/Topography';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { deleteHistoryItem, getUserHistory } from '../services/firestore';
 import { QueryDocumentSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';

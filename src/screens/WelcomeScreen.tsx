@@ -78,8 +78,8 @@ const WelcomeScreen = ({ navigation }: any) => {
             <Text style={styles.eyebrow}>Smart farming assistant</Text>
             <Text style={styles.title}>SmartCrop</Text>
           </View>
-          <Text style={styles.subtitle}>Crop planning for Luwero District.</Text>
-          <Text style={styles.description}>Sign in to access recommendations, analysis, and farm history.</Text>
+          <Text style={styles.subtitle}>Seasonal crop planning for Luwero District.</Text>
+          <Text style={styles.description}>Sign in to view recommendations, planning guidance, and farm history.</Text>
 
           <View style={styles.actions}>
             <Pressable style={styles.primaryButton} onPress={() => navigation.navigate('Login')}>

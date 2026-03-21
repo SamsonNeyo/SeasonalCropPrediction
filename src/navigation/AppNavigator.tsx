@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { FONT_FAMILY } from '../constants/typography';
+import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -62,9 +62,9 @@ const MainTabs = () => {
           marginTop: 2,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '700',
-          lineHeight: 12,
+          fontSize: Platform.OS === 'web' ? TYPE.caption : TYPE.tiny,
+          fontWeight: WEIGHT.semibold,
+          lineHeight: Platform.OS === 'web' ? 14 : 12,
           marginTop: 2,
           marginBottom: 2,
           fontFamily: FONT_FAMILY,
