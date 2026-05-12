@@ -22,14 +22,23 @@ import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
 import { useAuth } from '../context/AuthContext';
 
-type StrengthInfo = { bars: number; label: string; color: string };
+type StrengthChecks = { length: boolean; upper: boolean; lower: boolean; number: boolean };
+type StrengthInfo = { bars: number; label: string; color: string; isStrong: boolean; checks: StrengthChecks };
 
 const getStrength = (pwd: string): StrengthInfo | null => {
   if (!pwd) return null;
-  if (pwd.length < 6) return { bars: 1, label: 'Weak — please add more strength!', color: '#EF4444' };
-  if (pwd.length < 8)  return { bars: 2, label: 'Fair — try adding numbers or symbols', color: '#F97316' };
-  if (pwd.length < 10) return { bars: 3, label: 'Good — almost there!', color: '#EAB308' };
-  return { bars: 4, label: 'Strong password', color: '#22C55E' };
+  const checks: StrengthChecks = {
+    length: pwd.length >= 8,
+    upper:  /[A-Z]/.test(pwd),
+    lower:  /[a-z]/.test(pwd),
+    number: /[0-9]/.test(pwd),
+  };
+  const passed = Object.values(checks).filter(Boolean).length;
+  const isStrong = passed === 4;
+  if (passed <= 1) return { bars: 1, label: 'Too weak',     color: '#EF4444', isStrong, checks };
+  if (passed === 2) return { bars: 2, label: 'Weak',         color: '#F97316', isStrong, checks };
+  if (passed === 3) return { bars: 3, label: 'Almost there', color: '#EAB308', isStrong, checks };
+  return              { bars: 4, label: 'Strong',         color: '#22C55E', isStrong, checks };
 };
 
 const SignupScreen = ({ navigation }: any) => {
@@ -68,13 +77,13 @@ const SignupScreen = ({ navigation }: any) => {
 
   const strength = getStrength(password);
   const passwordMismatch = !!confirmPassword && confirmPassword !== password;
-  const disableSubmit = !name.trim() || !email.trim() || !password || !confirmPassword || !acceptTerms;
+  const disableSubmit = !name.trim() || !email.trim() || !password || !confirmPassword || !acceptTerms || !strength?.isStrong;
 
   const handleSignup = async () => {
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
       setError('All fields are required.'); return;
     }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (!strength?.isStrong) { setError('Password does not meet the strength requirements below.'); return; }
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
     if (!acceptTerms) { setError('Please accept the terms to continue.'); return; }
     try {
@@ -179,7 +188,7 @@ const SignupScreen = ({ navigation }: any) => {
                 </Pressable>
               </View>
 
-              {/* Strength bar */}
+              {/* Strength bar + requirements */}
               {strength && (
                 <View style={styles.strengthWrap}>
                   <View style={styles.strengthBars}>
@@ -196,6 +205,25 @@ const SignupScreen = ({ navigation }: any) => {
                   <Text style={[styles.strengthLabel, { color: strength.color }]}>
                     {strength.label}
                   </Text>
+                  <View style={styles.requirementsList}>
+                    {([
+                      { key: 'length', label: 'At least 8 characters',  met: strength.checks.length },
+                      { key: 'upper',  label: 'Uppercase letter (A–Z)', met: strength.checks.upper  },
+                      { key: 'lower',  label: 'Lowercase letter (a–z)', met: strength.checks.lower  },
+                      { key: 'number', label: 'Number (0–9)',            met: strength.checks.number },
+                    ] as const).map(req => (
+                      <View key={req.key} style={styles.requirementRow}>
+                        <MaterialCommunityIcons
+                          name={req.met ? 'check-circle' : 'circle-outline'}
+                          size={13}
+                          color={req.met ? '#22C55E' : colors.lightText}
+                        />
+                        <Text style={[styles.requirementText, req.met && styles.requirementMet]}>
+                          {req.label}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
             </View>
@@ -390,6 +418,22 @@ const createStyles = (c: ThemeColors) =>
     strengthLabel: {
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+      marginBottom: 6,
+    },
+    requirementsList: { gap: 4 },
+    requirementRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    requirementText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+    },
+    requirementMet: {
+      color: '#22C55E',
       fontWeight: WEIGHT.semibold,
     },
     fieldError: {
