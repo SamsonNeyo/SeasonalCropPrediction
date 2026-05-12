@@ -22,6 +22,7 @@ import AIAdvisorScreen from '../screens/AIAdvisorScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProfileSetupScreen from '../screens/ProfileSetupScreen';
+import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -172,7 +173,7 @@ const AppNavigator = () => {
       }}
     >
       <Stack.Navigator
-        key={!user ? 'auth' : !isProfileComplete ? 'setup' : 'main'}
+        key={!user ? 'auth' : !user.emailVerified ? 'verify' : !isProfileComplete ? 'setup' : 'main'}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       >
         {!user ? (
@@ -182,6 +183,8 @@ const AppNavigator = () => {
             <Stack.Screen name="Signup" component={SignupScreen} />
             <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           </>
+        ) : !user.emailVerified ? (
+          <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
         ) : !isProfileComplete ? (
           <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         ) : (
