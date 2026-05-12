@@ -33,34 +33,73 @@ const getWebHost = () => {
   return window.location?.hostname || '';
 };
 
-const API_BASE = (() => {
-  const envBase = process.env.EXPO_PUBLIC_API_BASE;
-  if (envBase) return envBase;
-
+const buildAutoDetectedBase = (): string => {
   const host = getDevHost();
   const webHost = getWebHost();
 
   if (Platform.OS === 'web') {
     return webHost ? `http://${webHost}:8000` : 'http://localhost:8000';
   }
-
   if (Platform.OS === 'android') {
-    // Prefer LAN host for Expo Go on device, fallback to emulator bridge.
+    // Prefer LAN host for Expo Go on a real device; fall back to the emulator bridge.
     return host ? `http://${host}:8000` : 'http://10.0.2.2:8000';
   }
-
   if (Platform.OS === 'ios') {
     return host ? `http://${host}:8000` : 'http://localhost:8000';
   }
-
-  // Web or other platforms
   return host ? `http://${host}:8000` : 'http://localhost:8000';
+};
+
+// Tunnel hosts (e.g. abcd-1234.tunnel.dev, exp.direct) expose Metro but NOT the
+// backend. Detect them so we don't try to reach the API through the tunnel.
+const isTunnelHost = (host: string): boolean => {
+  if (!host) return false;
+  return /\.exp\.direct$|\.tunnel\.expo\.dev$|\.tunnel\.dev$|ngrok/i.test(host);
+};
+
+const API_BASE = (() => {
+  // In development, prefer the Expo dev host since the device already proved it
+  // can reach that IP (it's serving the JS bundle). This avoids stale env IPs
+  // after switching Wi-Fi networks.
+  if (__DEV__) {
+    const devHost = getDevHost();
+    if (devHost && !isTunnelHost(devHost)) {
+      const auto = buildAutoDetectedBase();
+      if (auto && !auto.includes('localhost') && !auto.includes('10.0.2.2')) {
+        return auto;
+      }
+    }
+    // Tunnel mode or no detectable host — fall back to env override.
+    const envBase = process.env.EXPO_PUBLIC_API_BASE;
+    if (envBase) return envBase;
+    return buildAutoDetectedBase();
+  }
+
+  const envBase = process.env.EXPO_PUBLIC_API_BASE;
+  if (envBase) return envBase;
+  return buildAutoDetectedBase();
 })();
+
+export const getApiBase = () => API_BASE;
 
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 40000,
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (axios.isAxiosError(error) && !error.response) {
+      const friendly = new Error(
+        `Could not reach the server at ${API_BASE}. Check that the backend is running and on the same network.`,
+      );
+      (friendly as any).code = 'NETWORK_UNREACHABLE';
+      return Promise.reject(friendly);
+    }
+    return Promise.reject(error);
+  },
+);
 
 export const getSoilZones = async () => {
   const cacheKey = 'soil-zones';

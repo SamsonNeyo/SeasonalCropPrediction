@@ -6,12 +6,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
+import { RADIUS, SPACING } from '../constants/spacing';
+import { elevation } from '../constants/elevation';
 
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ManualAnalysisScreen from '../screens/ManualAnalysisScreen';
 import AIAdvisorScreen from '../screens/AIAdvisorScreen';
@@ -23,6 +27,20 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const PERSISTENCE_KEY = 'smartcrop-nav-state';
 
+type TabIconConfig = {
+  outline: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+  filled: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+  label: string;
+};
+
+const TAB_ICONS: Record<string, TabIconConfig> = {
+  Home: { outline: 'home-variant-outline', filled: 'home-variant', label: 'Home' },
+  AI: { outline: 'brain', filled: 'brain', label: 'AI Advisor' },
+  Manual: { outline: 'clipboard-edit-outline', filled: 'clipboard-edit', label: 'Manual analysis' },
+  History: { outline: 'history', filled: 'history', label: 'History' },
+  Profile: { outline: 'account-circle-outline', filled: 'account-circle', label: 'Profile' },
+};
+
 const MainTabs = () => {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createTabStyles(colors), [colors]);
@@ -30,65 +48,58 @@ const MainTabs = () => {
   return (
     <Tab.Navigator
       initialRouteName="Home"
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.lightText,
-        tabBarShowLabel: true,
-        tabBarHideOnKeyboard: true,
-        sceneStyle: {
-          paddingBottom: 96,
-          backgroundColor: colors.background,
-        },
-        tabBarStyle: {
-          height: 76,
-          paddingBottom: 12,
-          paddingTop: 10,
-          borderTopWidth: 0,
-          backgroundColor: colors.surface,
-          borderRadius: 24,
-          marginHorizontal: 12,
-          marginBottom: Platform.OS === 'ios' ? 14 : 10,
-          position: 'absolute',
-          shadowColor: colors.shadow,
-          shadowOpacity: 0.16,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 12,
-          overflow: 'visible',
-        },
-        tabBarItemStyle: styles.tabItem,
-        tabBarIconStyle: {
-          marginTop: 2,
-        },
-        tabBarLabelStyle: {
-          fontSize: Platform.OS === 'web' ? TYPE.caption : TYPE.tiny,
-          fontWeight: WEIGHT.semibold,
-          lineHeight: Platform.OS === 'web' ? 14 : 12,
-          marginTop: 2,
-          marginBottom: 2,
-          fontFamily: FONT_FAMILY,
-        },
-        tabBarIcon: ({ color, size, focused }) => {
-          let iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] = 'home-variant-outline';
-          if (route.name === 'Home') iconName = 'home-variant-outline';
-          if (route.name === 'AI') iconName = 'brain';
-          if (route.name === 'Manual') iconName = 'clipboard-edit-outline';
-          if (route.name === 'History') iconName = 'history';
-          if (route.name === 'Profile') iconName = 'account-circle-outline';
-          const wrapperStyle = [styles.iconWrap, focused && styles.iconWrapFocused];
-
-          return (
-            <View style={wrapperStyle}>
-              <MaterialCommunityIcons name={iconName} size={size} color={color} />
-            </View>
-          );
-        },
-      })}
+      screenOptions={({ route }) => {
+        const config = TAB_ICONS[route.name];
+        return {
+          headerShown: false,
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.lightText,
+          tabBarShowLabel: true,
+          tabBarHideOnKeyboard: true,
+          tabBarAccessibilityLabel: config?.label || route.name,
+          sceneStyle: {
+            paddingBottom: 96,
+            backgroundColor: colors.background,
+          },
+          tabBarStyle: {
+            height: 76,
+            paddingBottom: 12,
+            paddingTop: 10,
+            borderTopWidth: 0,
+            backgroundColor: colors.surface,
+            borderRadius: RADIUS.xxl,
+            marginHorizontal: SPACING.md,
+            marginBottom: Platform.OS === 'ios' ? 14 : 10,
+            position: 'absolute',
+            ...elevation(colors.shadow, 'lg'),
+            overflow: 'visible',
+          },
+          tabBarItemStyle: styles.tabItem,
+          tabBarIconStyle: { marginTop: 2 },
+          tabBarLabelStyle: {
+            fontSize: Platform.OS === 'web' ? TYPE.caption : TYPE.tiny,
+            fontWeight: WEIGHT.semibold,
+            lineHeight: Platform.OS === 'web' ? 14 : 12,
+            marginTop: 2,
+            marginBottom: 2,
+            fontFamily: FONT_FAMILY,
+          },
+          tabBarIcon: ({ color, size, focused }) => {
+            const iconName = focused
+              ? config?.filled || 'home-variant'
+              : config?.outline || 'home-variant-outline';
+            return (
+              <View style={[styles.iconWrap, focused && styles.iconWrapFocused]}>
+                <MaterialCommunityIcons name={iconName} size={size} color={color} />
+              </View>
+            );
+          },
+        };
+      }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="AI" component={AIAdvisorScreen} options={{ title: 'AI Advisor' }} />
-      <Tab.Screen name="Manual" component={ManualAnalysisScreen} options={{ title: 'Manual Analysis' }} />
+      <Tab.Screen name="Manual" component={ManualAnalysisScreen} options={{ title: 'Manual' }} />
       <Tab.Screen name="History" component={HistoryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -123,9 +134,18 @@ const AppNavigator = () => {
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     try {
-      const stored = localStorage.getItem(PERSISTENCE_KEY);
-      if (stored) {
-        setInitialState(JSON.parse(stored));
+      // If we just returned from a Google sign-in redirect, the stored nav state
+      // points to the Login screen and would conflict with the now-authenticated
+      // route stack. Clear it so we start fresh on the correct screen.
+      const googlePending = localStorage.getItem('sc-google-auth-pending');
+      if (googlePending) {
+        localStorage.removeItem('sc-google-auth-pending');
+        localStorage.removeItem(PERSISTENCE_KEY);
+      } else {
+        const stored = localStorage.getItem(PERSISTENCE_KEY);
+        if (stored) {
+          setInitialState(JSON.parse(stored));
+        }
       }
     } catch {
       // Ignore persistence errors.
@@ -152,7 +172,7 @@ const AppNavigator = () => {
       }}
     >
       <Stack.Navigator
-        key={user ? 'user' : 'guest'}
+        key={!user ? 'auth' : !isProfileComplete ? 'setup' : 'main'}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       >
         {!user ? (
@@ -160,6 +180,7 @@ const AppNavigator = () => {
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Signup" component={SignupScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           </>
         ) : !isProfileComplete ? (
           <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
@@ -175,21 +196,21 @@ const AppNavigator = () => {
 
 export default AppNavigator;
 
-const createTabStyles = (colors: any) =>
+const createTabStyles = (c: ThemeColors) =>
   StyleSheet.create({
     tabItem: {
       paddingVertical: 4,
     },
     iconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
+      width: 38,
+      height: 38,
+      borderRadius: RADIUS.md + 1,
       alignItems: 'center',
       justifyContent: 'center',
     },
     iconWrapFocused: {
-      backgroundColor: colors.pillBg,
+      backgroundColor: c.pillBg,
       borderWidth: 1,
-      borderColor: colors.pillBorder,
+      borderColor: c.pillBorder,
     },
   });

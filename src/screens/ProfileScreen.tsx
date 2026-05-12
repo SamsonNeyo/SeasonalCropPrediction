@@ -5,14 +5,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   Image,
-  ActivityIndicator,
   Animated,
   Easing,
   Switch,
-  Modal,
-  Pressable,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,20 +18,42 @@ import * as Notifications from 'expo-notifications';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
+import { RADIUS, SPACING } from '../constants/spacing';
+import { elevation } from '../constants/elevation';
 import { useAuth } from '../context/AuthContext';
-import { getSoilZones } from '../services/api';
+import { getSoilZones, predictBySubCounty } from '../services/api';
+import {
+  cancelWeatherAlertNotification,
+  ensureNotificationPermission,
+  scheduleWeatherAlertNotification,
+} from '../services/notifications';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import Chip from '../components/Chip';
+import TextField from '../components/TextField';
+import Skeleton from '../components/Skeleton';
+import SelectSheet, { SelectOption } from '../components/SelectSheet';
+import { useToast } from '../components/Toast';
+
+const getCurrentSeason = () => {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 6) return 'First';
+  if (month >= 8 && month <= 12) return 'Second';
+  return 'First';
+};
 
 const ProfileScreen = () => {
   const { colors, isDark, setDarkMode } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const { user, userData, logout, updateUserData } = useAuth();
+  const toast = useToast();
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingZones, setLoadingZones] = useState(true);
   const [subCountyOpen, setSubCountyOpen] = useState(false);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [name, setName] = useState(userData?.name || user?.email?.split('@')[0] || 'Farmer');
   const [zones, setZones] = useState<Array<{ sub_county: string; soil_type: string }>>([]);
   const [subCounty, setSubCounty] = useState(userData?.subCounty || 'Bamunanika');
@@ -45,14 +63,16 @@ const ProfileScreen = () => {
   const [photoUri, setPhotoUri] = useState<string | null>(userData?.photoUri || null);
   const [tipsEnabled, setTipsEnabled] = useState(true);
   const [weatherAlerts, setWeatherAlerts] = useState(true);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
   const headerIn = useRef(new Animated.Value(0)).current;
   const cardIn = useRef(new Animated.Value(0)).current;
-  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useScrollToTop(scrollRef);
 
   const displayName = useMemo(() => name || user?.email?.split('@')[0] || 'Farmer', [name, user?.email]);
+  const savedSubCounty = userData?.subCounty || subCounty || 'Bamunanika';
+  const savedRegion = userData?.region || region || 'Luwero';
 
   useEffect(() => {
     if (!userData) return;
@@ -114,31 +134,31 @@ const ProfileScreen = () => {
         if (alerts !== null) setWeatherAlerts(alerts === 'true');
       } catch {
         // Ignore preference load errors.
+      } finally {
+        setPrefsLoaded(true);
       }
     };
     loadPrefs();
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    if (!prefsLoaded) return;
+    const syncNotifications = async () => {
+      try {
+        if (tipsEnabled) await scheduleTips(false);
+        if (weatherAlerts) await scheduleWeatherAlerts(false);
+      } catch {
+        // Ignore background notification refresh failures.
+      }
     };
-  }, []);
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    if (successTimerRef.current) clearTimeout(successTimerRef.current);
-    successTimerRef.current = setTimeout(() => setToast(null), 3000);
-  };
+    void syncNotifications();
+  }, [prefsLoaded, savedRegion, savedSubCounty]);
 
   const handleSelectSubCounty = (value: string) => {
     setSubCounty(value);
     const mapped = zones.find((z) => z.sub_county === value);
-    if (mapped) {
-      setSoilType(mapped.soil_type);
-    }
+    if (mapped) setSoilType(mapped.soil_type);
   };
-
 
   const handlePickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -153,16 +173,13 @@ const ProfileScreen = () => {
     });
     if (result.canceled) return;
     const asset = result.assets[0];
-    if (asset.base64) {
-      setPhotoBase64(`data:image/jpeg;base64,${asset.base64}`);
-    }
+    if (asset.base64) setPhotoBase64(`data:image/jpeg;base64,${asset.base64}`);
     setPhotoUri(asset.uri);
   };
 
   const handleSave = async () => {
     try {
       setError('');
-      setToast(null);
       setSaving(true);
       await updateUserData({
         name: name.trim() || 'Farmer',
@@ -173,11 +190,11 @@ const ProfileScreen = () => {
         photoUri: photoUri || null,
       });
       setEditMode(false);
-      showToast('Profile saved successfully.');
+      toast.show({ message: 'Profile saved successfully.', tone: 'success' });
     } catch (e: any) {
       const msg = e?.message || 'Could not save profile';
       setError(msg);
-      showToast(msg, 'error');
+      toast.show({ message: msg, tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -186,7 +203,6 @@ const ProfileScreen = () => {
   const savePref = async (key: string, value: boolean) => {
     try {
       await AsyncStorage.setItem(key, String(value));
-      showToast('Settings saved successfully.');
     } catch {
       // Ignore preference save errors.
     }
@@ -202,24 +218,45 @@ const ProfileScreen = () => {
     });
   };
 
-  const ensureNotifPermission = async (): Promise<boolean> => {
-    const current = await Notifications.getPermissionsAsync();
-    if (current.status === 'granted') return true;
-    const req = await Notifications.requestPermissionsAsync();
-    return req.status === 'granted';
+  const buildTipsNotificationContent = async () => {
+    const seasonValue = getCurrentSeason();
+    const fallback = {
+      title: `SmartCrop ${seasonValue} season tip`,
+      body: `Plan field work in ${savedSubCounty} around soil moisture, timely planting, and regular crop scouting this week.`,
+    };
+    try {
+      const prediction = await predictBySubCounty({
+        sub_county: savedSubCounty,
+        season: seasonValue,
+      });
+      const topCrop = prediction?.recommendations?.[0]?.crop;
+      const weatherExpectation = String(prediction?.season_advice?.weather_expectation || '').trim();
+      const focus = String(prediction?.season_advice?.focus || '').trim();
+      if (!topCrop && !weatherExpectation && !focus) return fallback;
+      const seasonLower = seasonValue.toLowerCase();
+      const focusLine = weatherExpectation || focus;
+      return {
+        title: `SmartCrop ${seasonValue} season tip`,
+        body: topCrop
+          ? `${savedSubCounty}: prioritize ${topCrop} this ${seasonLower} season. ${focusLine || 'Check soil moisture before planting.'}`
+          : `${savedSubCounty}: ${focusLine || fallback.body}`,
+      };
+    } catch {
+      return fallback;
+    }
   };
 
-  const scheduleTips = async () => {
+  const scheduleTips = async (requestPermission = true) => {
     await ensureAndroidTipsChannel();
-    const ok = await ensureNotifPermission();
+    const ok = await ensureNotificationPermission(requestPermission);
     if (!ok) return false;
     const existing = await AsyncStorage.getItem('smartcrop_tips_notif_id');
-    if (existing) return true;
+    if (existing) {
+      await Notifications.cancelScheduledNotificationAsync(existing);
+    }
+    const content = await buildTipsNotificationContent();
     const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'SmartCrop tip',
-        body: 'Weekly farm tip: check soil moisture before planting.',
-      },
+      content,
       trigger:
         Platform.OS === 'android'
           ? {
@@ -247,670 +284,627 @@ const ProfileScreen = () => {
     }
   };
 
-  const scheduleWeatherAlerts = async () => {
-    await ensureAndroidTipsChannel();
-    const ok = await ensureNotifPermission();
-    if (!ok) return false;
-    const existing = await AsyncStorage.getItem('smartcrop_weather_notif_id');
-    if (existing) return true;
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'SmartCrop weather alert',
-        body: 'Check today\'s weather for heavy rain or dry spell risks.',
-      },
-      trigger:
-        Platform.OS === 'android'
-          ? {
-              type: Notifications.SchedulableTriggerInputTypes.DAILY,
-              hour: 6,
-              minute: 30,
-              channelId: 'farming-tips',
-            }
-          : {
-              type: Notifications.SchedulableTriggerInputTypes.DAILY,
-              hour: 6,
-              minute: 30,
-            },
+  const scheduleWeatherAlerts = async (requestPermission = true) => {
+    return scheduleWeatherAlertNotification({
+      subCounty: savedSubCounty,
+      region: savedRegion,
+      requestPermission,
     });
-    await AsyncStorage.setItem('smartcrop_weather_notif_id', id);
-    return true;
   };
 
   const cancelWeatherAlerts = async () => {
-    const existing = await AsyncStorage.getItem('smartcrop_weather_notif_id');
-    if (existing) {
-      await Notifications.cancelScheduledNotificationAsync(existing);
-      await AsyncStorage.removeItem('smartcrop_weather_notif_id');
+    await cancelWeatherAlertNotification();
+  };
+
+  const handleTipsToggle = async (v: boolean) => {
+    try {
+      if (v) {
+        const ok = await scheduleTips();
+        if (!ok) {
+          toast.show({ message: 'Enable notifications to receive farming tips.', tone: 'warning' });
+          setTipsEnabled(false);
+          await savePref('smartcrop_tips', false);
+          return;
+        }
+        setTipsEnabled(true);
+        await savePref('smartcrop_tips', true);
+      } else {
+        await cancelTips();
+        setTipsEnabled(false);
+        await savePref('smartcrop_tips', false);
+      }
+    } catch {
+      toast.show({ message: 'Could not update farming tips notification.', tone: 'error' });
     }
   };
 
+  const handleWeatherAlertsToggle = async (v: boolean) => {
+    try {
+      if (v) {
+        const ok = await scheduleWeatherAlerts();
+        if (!ok) {
+          toast.show({ message: 'Enable notifications to receive weather alerts.', tone: 'warning' });
+          setWeatherAlerts(false);
+          await savePref('smartcrop_weather_alerts', false);
+          return;
+        }
+        setWeatherAlerts(true);
+        await savePref('smartcrop_weather_alerts', true);
+      } else {
+        await cancelWeatherAlerts();
+        setWeatherAlerts(false);
+        await savePref('smartcrop_weather_alerts', false);
+      }
+    } catch {
+      toast.show({ message: 'Could not update weather alerts notification.', tone: 'error' });
+    }
+  };
+
+  const subCountyOptions: SelectOption<string>[] = useMemo(
+    () =>
+      zones.map((z) => ({
+        label: z.sub_county,
+        value: z.sub_county,
+        description: `Mapped soil: ${z.soil_type}`,
+      })),
+    [zones],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: headerIn,
-            transform: [
-              {
-                translateY: headerIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [12, 0],
-                }),
-              },
-            ],
-          },
-        ]}
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity style={styles.avatar} onPress={handlePickImage}>
-          {photoBase64 || photoUri ? (
-            <Image source={{ uri: photoBase64 || photoUri || undefined }} style={styles.avatarImage} />
-          ) : (
-            <MaterialCommunityIcons name="account-circle" size={64} color={colors.primary} />
-          )}
-          {editMode && (
-            <View style={styles.avatarBadge}>
-              <MaterialCommunityIcons name="camera" size={14} color={colors.white} />
-            </View>
-          )}
-        </TouchableOpacity>
-        <Text style={styles.name}>{displayName}</Text>
-        <Text style={styles.email}>{user?.email || 'user@smartcrop.app'}</Text>
-        <Text style={styles.tapHint}>Tap the photo to change</Text>
-        <View style={styles.profileMetaRow}>
-          <View style={styles.profileMetaChip}>
-            <MaterialCommunityIcons name="map-marker-outline" size={13} color={colors.secondary} />
-            <Text style={styles.profileMetaText}>{subCounty}</Text>
-          </View>
-          <View style={styles.profileMetaChip}>
-            <MaterialCommunityIcons name="layers-outline" size={13} color={colors.secondary} />
-            <Text style={styles.profileMetaText}>{soilType}</Text>
-          </View>
-        </View>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity: cardIn,
-            transform: [
-              {
-                translateY: cardIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [16, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.sectionBadge}>
-          <MaterialCommunityIcons name="account-edit-outline" size={13} color={colors.primary} />
-          <Text style={styles.sectionBadgeText}>Identity</Text>
-        </View>
-        <Text style={styles.sectionTitle}>Farm Profile</Text>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Name</Text>
-          <TextInput
-            style={[styles.input, !editMode && styles.inputDisabled]}
-            editable={editMode}
-            value={name}
-            onChangeText={setName}
-            placeholder="Full name"
-            placeholderTextColor={colors.lightText}
-          />
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Sub-county</Text>
-          {loadingZones ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : (
-            <TouchableOpacity
-              style={[styles.input, styles.selectField, !editMode && styles.inputDisabled]}
-              onPress={() => editMode && setSubCountyOpen(true)}
-              disabled={!editMode}
-            >
-              <Text style={styles.selectValue}>{subCounty || 'Select sub-county'}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Mapped Soil Type</Text>
-          <TextInput
-            style={[styles.input, styles.inputDisabled]}
-            editable={false}
-            value={soilType}
-            placeholder="Mapped automatically"
-            placeholderTextColor={colors.lightText}
-          />
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Region</Text>
-          <TextInput
-            style={[styles.input, !editMode && styles.inputDisabled]}
-            editable={editMode}
-            value={region}
-            onChangeText={setRegion}
-            placeholder="Region"
-            placeholderTextColor={colors.lightText}
-          />
-        </View>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity: cardIn,
-            transform: [
-              {
-                translateY: cardIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [22, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.sectionBadge}>
-          <MaterialCommunityIcons name="chart-box-outline" size={13} color={colors.primary} />
-          <Text style={styles.sectionBadgeText}>Snapshot</Text>
-        </View>
-        <Text style={styles.sectionTitle}>Farm Snapshot</Text>
-        <Text style={styles.sectionCaption}>Quick profile highlights for your planning context.</Text>
-
-        <View style={styles.infoRow}>
-          <View style={styles.infoIcon}>
-            <MaterialCommunityIcons name="calendar-check-outline" size={18} color={colors.secondary} />
-          </View>
-          <View style={styles.infoBody}>
-            <Text style={styles.rowText}>Season focus</Text>
-            <Text style={styles.mutedSmall}>Use First/Second season recommendations on Home.</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <View style={styles.infoIcon}>
-            <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.secondary} />
-          </View>
-          <View style={styles.infoBody}>
-            <Text style={styles.rowText}>Sub-county</Text>
-            <Text style={styles.mutedSmall}>{subCounty || 'Not set'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <View style={styles.infoIcon}>
-            <MaterialCommunityIcons name="sprout" size={18} color={colors.secondary} />
-          </View>
-          <View style={styles.infoBody}>
-            <Text style={styles.rowText}>Soil profile</Text>
-            <Text style={styles.mutedSmall}>{soilType} (mapped from sub-county)</Text>
-          </View>
-        </View>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity: cardIn,
-            transform: [
-              {
-                translateY: cardIn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [22, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.sectionBadge}>
-          <MaterialCommunityIcons name="cog-outline" size={13} color={colors.primary} />
-          <Text style={styles.sectionBadgeText}>Preferences</Text>
-        </View>
-        <Text style={styles.sectionTitle}>Settings</Text>
-        <Text style={styles.sectionCaption}>Personalize how SmartCrop works for you.</Text>
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingText}>
-            <Text style={styles.rowText}>Dark mode</Text>
-            <Text style={styles.mutedSmall}>Reduce eye strain in low light.</Text>
-          </View>
-          <Switch
-            value={isDark}
-            onValueChange={(v) => {
-              setDarkMode(v);
-            }}
-            trackColor={{ false: '#d9d9d9', true: '#A7D0A7' }}
-            thumbColor={isDark ? colors.primary : '#f4f4f4'}
-          />
-        </View>
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingText}>
-            <Text style={styles.rowText}>Farming tips</Text>
-            <Text style={styles.mutedSmall}>Get weekly guidance and best practices.</Text>
-          </View>
-          <Switch
-            value={tipsEnabled}
-            onValueChange={async (v) => {
-              try {
-                if (v) {
-                  const ok = await scheduleTips();
-                  if (!ok) {
-                    showToast('Enable notifications to receive farming tips.', 'error');
-                    setTipsEnabled(false);
-                    await savePref('smartcrop_tips', false);
-                    return;
-                  }
-                  setTipsEnabled(true);
-                  await savePref('smartcrop_tips', true);
-                } else {
-                  await cancelTips();
-                  setTipsEnabled(false);
-                  await savePref('smartcrop_tips', false);
-                }
-              } catch {
-                if (v) {
-                  showToast('Could not schedule farming tips on this device.', 'error');
-                  setTipsEnabled(false);
-                  await savePref('smartcrop_tips', false);
-                } else {
-                  showToast('Could not update farming tips notification.', 'error');
-                  setTipsEnabled(true);
-                  await savePref('smartcrop_tips', true);
-                }
-              }
-            }}
-            trackColor={{ false: '#d9d9d9', true: '#A7D0A7' }}
-            thumbColor={tipsEnabled ? colors.primary : '#f4f4f4'}
-          />
-        </View>
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingText}>
-            <Text style={styles.rowText}>Weather alerts</Text>
-            <Text style={styles.mutedSmall}>Be notified about heavy rain or dry spells.</Text>
-          </View>
-          <Switch
-            value={weatherAlerts}
-            onValueChange={async (v) => {
-              try {
-                if (v) {
-                  const ok = await scheduleWeatherAlerts();
-                  if (!ok) {
-                    showToast('Enable notifications to receive weather alerts.', 'error');
-                    setWeatherAlerts(false);
-                    await savePref('smartcrop_weather_alerts', false);
-                    return;
-                  }
-                  setWeatherAlerts(true);
-                  await savePref('smartcrop_weather_alerts', true);
-                } else {
-                  await cancelWeatherAlerts();
-                  setWeatherAlerts(false);
-                  await savePref('smartcrop_weather_alerts', false);
-                }
-              } catch {
-                showToast('Could not update weather alerts notification.', 'error');
-                setWeatherAlerts(!v);
-                await savePref('smartcrop_weather_alerts', !v);
-              }
-            }}
-            trackColor={{ false: '#d9d9d9', true: '#A7D0A7' }}
-            thumbColor={weatherAlerts ? colors.primary : '#f4f4f4'}
-          />
-        </View>
-
-      </Animated.View>
-
-      {!!error && <Text style={styles.error}>{error}</Text>}
-
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[styles.secondaryButton, editMode && styles.secondaryButtonActive]}
-          onPress={() => setEditMode(!editMode)}
-          disabled={saving}
+        <Animated.View
+          style={[
+            styles.header,
+            {
+              opacity: headerIn,
+              transform: [
+                { translateY: headerIn.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
+              ],
+            },
+          ]}
         >
-          <Text style={[styles.secondaryText, editMode && styles.secondaryTextActive]}>
-            {editMode ? 'Cancel' : 'Edit Profile'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSave} disabled={saving || !editMode}>
-          {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>Save</Text>}
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <MaterialCommunityIcons name="logout" size={18} color={colors.white} />
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
-      </ScrollView>
-      <Modal visible={subCountyOpen} transparent animationType="fade" onRequestClose={() => setSubCountyOpen(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setSubCountyOpen(false)}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Sub-county</Text>
-              <TouchableOpacity onPress={() => setSubCountyOpen(false)}>
-                <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {zones.map((z) => {
-                const active = subCounty === z.sub_county;
-                return (
-                  <TouchableOpacity
-                    key={z.sub_county}
-                    style={[styles.modalOption, active && styles.modalOptionActive]}
-                    onPress={() => {
-                      handleSelectSubCounty(z.sub_county);
-                      setSubCountyOpen(false);
-                    }}
-                  >
-                    <View style={styles.modalOptionText}>
-                      <Text style={[styles.modalOptionTitle, active && styles.modalOptionTitleActive]}>{z.sub_county}</Text>
-                      <Text style={styles.modalOptionHint}>Mapped soil: {z.soil_type}</Text>
-                    </View>
-                    {active && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+          <TouchableOpacity
+            style={styles.avatar}
+            onPress={editMode ? handlePickImage : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={editMode ? 'Change profile photo' : 'Profile photo'}
+            disabled={!editMode}
+          >
+            {photoBase64 || photoUri ? (
+              <Image source={{ uri: photoBase64 || photoUri || undefined }} style={styles.avatarImage} />
+            ) : (
+              <MaterialCommunityIcons name="account-circle" size={72} color={colors.primary} />
+            )}
+            {editMode && (
+              <View style={styles.avatarBadge}>
+                <MaterialCommunityIcons name="camera" size={14} color={colors.white} />
+              </View>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.email}>{user?.email || 'user@smartcrop.app'}</Text>
+          {editMode && <Text style={styles.tapHint}>Tap the photo to change</Text>}
+          <View style={styles.profileMetaRow}>
+            <Chip label={subCounty} icon="map-marker-outline" tone="success" size="sm" />
+            <Chip label={soilType} icon="layers-outline" tone="neutral" size="sm" />
           </View>
-        </Pressable>
-      </Modal>
-      {!!toast && (
-        <View style={[styles.toast, toast.type === 'error' ? styles.toastError : styles.toastSuccess]}>
-          <MaterialCommunityIcons
-            name={toast.type === 'error' ? 'alert-circle-outline' : 'check-circle-outline'}
-            size={16}
-            color={colors.white}
-          />
-          <Text style={styles.toastText}>{toast.message}</Text>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            opacity: cardIn,
+            transform: [{ translateY: cardIn.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+          }}
+        >
+          <Card variant="glass" padding="lg" emphasis="md" style={styles.card}>
+            <View style={styles.sectionHead}>
+              <View style={styles.sectionBadge}>
+                <MaterialCommunityIcons name="account-edit-outline" size={13} color={colors.primary} />
+                <Text style={styles.sectionBadgeText}>Identity</Text>
+              </View>
+              <Text style={styles.sectionTitle}>Farm profile</Text>
+            </View>
+
+            {editMode ? (
+              <>
+                <TextField
+                  label="Name"
+                  placeholder="Full name"
+                  value={name}
+                  onChangeText={setName}
+                  leftIcon={<MaterialCommunityIcons name="account-outline" size={18} color={colors.lightText} />}
+                  accessibilityLabel="Name"
+                />
+                <Text style={styles.fieldLabel}>Sub-county</Text>
+                {loadingZones ? (
+                  <Skeleton height={48} borderRadius={RADIUS.md} style={styles.skel} />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.selectField}
+                    onPress={() => setSubCountyOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Select sub-county"
+                  >
+                    <View style={styles.selectLeft}>
+                      <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.lightText} />
+                      <Text style={styles.selectValue}>{subCounty || 'Select sub-county'}</Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
+                  </TouchableOpacity>
+                )}
+                <View style={styles.soilCard}>
+                  <View style={styles.soilIcon}>
+                    <MaterialCommunityIcons name="terrain" size={16} color={colors.secondary} />
+                  </View>
+                  <View style={styles.soilTextWrap}>
+                    <Text style={styles.soilLabel}>Mapped soil type</Text>
+                    <Text style={styles.soilValue}>{soilType || 'Auto-mapped from sub-county'}</Text>
+                  </View>
+                </View>
+                <TextField
+                  label="Region"
+                  placeholder="Region"
+                  value={region}
+                  onChangeText={setRegion}
+                  leftIcon={<MaterialCommunityIcons name="earth" size={18} color={colors.lightText} />}
+                  accessibilityLabel="Region"
+                />
+              </>
+            ) : (
+              <View style={styles.readGroup}>
+                <ReadRow icon="account-outline" label="Name" value={displayName} colors={colors} />
+                <ReadRow icon="map-marker-outline" label="Sub-county" value={subCounty} colors={colors} />
+                <ReadRow icon="terrain" label="Soil type" value={soilType} colors={colors} hint="Mapped from sub-county" />
+                <ReadRow icon="earth" label="Region" value={region} colors={colors} />
+              </View>
+            )}
+          </Card>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            opacity: cardIn,
+            transform: [{ translateY: cardIn.interpolate({ inputRange: [0, 1], outputRange: [22, 0] }) }],
+          }}
+        >
+          <Card variant="glass" padding="lg" emphasis="md" style={styles.card}>
+            <View style={styles.sectionHead}>
+              <View style={styles.sectionBadge}>
+                <MaterialCommunityIcons name="cog-outline" size={13} color={colors.primary} />
+                <Text style={styles.sectionBadgeText}>Preferences</Text>
+              </View>
+              <Text style={styles.sectionTitle}>Settings</Text>
+              <Text style={styles.sectionCaption}>Personalize how SmartCrop works for you.</Text>
+            </View>
+
+            <SettingRow
+              colors={colors}
+              icon="weather-night"
+              title="Dark mode"
+              description="Reduce eye strain in low light."
+              value={isDark}
+              onValueChange={setDarkMode}
+            />
+            <SettingRow
+              colors={colors}
+              icon="lightbulb-on-outline"
+              title="Farming tips"
+              description="Get weekly guidance and best practices."
+              value={tipsEnabled}
+              onValueChange={handleTipsToggle}
+            />
+            <SettingRow
+              colors={colors}
+              icon="weather-cloudy-alert"
+              title="Weather alerts"
+              description="Be notified about heavy rain or dry spells."
+              value={weatherAlerts}
+              onValueChange={handleWeatherAlertsToggle}
+              isLast
+            />
+          </Card>
+        </Animated.View>
+
+        {!!error && (
+          <View style={styles.errorBanner}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.error} />
+            <Text style={styles.errorBannerText}>{error}</Text>
+          </View>
+        )}
+
+        <View style={styles.actionRow}>
+          {editMode ? (
+            <>
+              <Button
+                label="Cancel"
+                variant="tertiary"
+                onPress={() => setEditMode(false)}
+                disabled={saving}
+                fullWidth
+                style={styles.actionBtn}
+                accessibilityLabel="Cancel editing"
+              />
+              <Button
+                label="Save"
+                onPress={handleSave}
+                loading={saving}
+                fullWidth
+                style={styles.actionBtn}
+                accessibilityLabel="Save profile"
+              />
+            </>
+          ) : (
+            <Button
+              label="Edit profile"
+              variant="secondary"
+              onPress={() => setEditMode(true)}
+              fullWidth
+              leftIcon={<MaterialCommunityIcons name="pencil-outline" size={18} color={colors.primary} />}
+              accessibilityLabel="Edit profile"
+            />
+          )}
         </View>
-      )}
+
+        <Button
+          label="Sign out"
+          variant="ghost"
+          onPress={logout}
+          fullWidth
+          leftIcon={<MaterialCommunityIcons name="logout" size={18} color={colors.error} />}
+          labelStyle={{ color: colors.error }}
+          style={styles.logoutBtn}
+          accessibilityLabel="Sign out"
+        />
+      </ScrollView>
+
+      <SelectSheet
+        visible={subCountyOpen}
+        onClose={() => setSubCountyOpen(false)}
+        title="Select sub-county"
+        subtitle="Soil type updates automatically when you choose."
+        options={subCountyOptions}
+        value={subCounty}
+        onSelect={(value) => {
+          handleSelectSubCounty(value);
+          setSubCountyOpen(false);
+        }}
+      />
     </SafeAreaView>
   );
 };
 
-const createStyles = (colors: any) =>
+type ReadRowProps = {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  value: string;
+  hint?: string;
+  colors: ThemeColors;
+};
+
+const ReadRow = ({ icon, label, value, hint, colors }: ReadRowProps) => {
+  const styles = useMemo(() => readRowStyles(colors), [colors]);
+  return (
+    <View style={styles.row}>
+      <View style={styles.iconWrap}>
+        <MaterialCommunityIcons name={icon} size={18} color={colors.secondary} />
+      </View>
+      <View style={styles.body}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.value}>{value || '—'}</Text>
+        {!!hint && <Text style={styles.hint}>{hint}</Text>}
+      </View>
+    </View>
+  );
+};
+
+const readRowStyles = (c: ThemeColors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 24 },
-  header: {
-    alignItems: 'center',
-    backgroundColor: colors.glass,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  avatarImage: { width: '100%', height: '100%' },
-  avatarBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  name: { fontFamily: FONT_FAMILY, fontSize: TYPE.h2, fontWeight: WEIGHT.bold, color: colors.primary },
-  email: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 4 },
-  tapHint: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.lightText, marginTop: 6 },
-  profileMetaRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  profileMetaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-    backgroundColor: colors.pillBg,
-    borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 9,
-  },
-  profileMetaText: {
-    marginLeft: 4,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.tiny,
-    color: colors.secondary,
-    fontWeight: WEIGHT.semibold,
-  },
-  card: {
-    backgroundColor: colors.glass,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  sectionBadge: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-    borderRadius: 999,
-    backgroundColor: colors.pillBg,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginBottom: 8,
-  },
-  sectionBadgeText: {
-    marginLeft: 4,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.tiny,
-    color: colors.primary,
-    fontWeight: WEIGHT.semibold,
-  },
-  sectionTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 10 },
-  sectionCaption: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 10 },
-  rowText: { fontFamily: FONT_FAMILY, marginLeft: 8, color: colors.text, fontSize: TYPE.body },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
-  },
-  infoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  infoBody: { flex: 1 },
-  mutedSmall: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  settingText: { flex: 1, paddingRight: 12 },
-  field: { marginBottom: 12 },
-  fieldLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: colors.glassSoft,
-    color: colors.text,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.body,
-  },
-  inputDisabled: {
-    backgroundColor: colors.surfaceAlt,
-    color: colors.lightText,
-  },
-  selectField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  selectValue: {
-    fontFamily: FONT_FAMILY,
-    color: colors.text,
-    fontSize: TYPE.body,
-  },
-  error: { fontFamily: FONT_FAMILY, color: colors.error, textAlign: 'center', marginBottom: 10, fontSize: TYPE.bodySmall },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  secondaryButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  secondaryButtonActive: { backgroundColor: colors.iconBg },
-  secondaryText: { fontFamily: FONT_FAMILY, color: colors.primary, fontWeight: WEIGHT.semibold },
-  secondaryTextActive: { color: colors.primary },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  primaryText: { fontFamily: FONT_FAMILY, color: colors.white, fontWeight: WEIGHT.semibold },
-  logoutButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 6,
-  },
-  logoutText: { fontFamily: FONT_FAMILY, color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body },
-  bgAccent: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: colors.iconBg,
-    right: -80,
-    top: -60,
-    opacity: 0.6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: colors.glass,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    maxHeight: 500,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  modalTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.bold, color: colors.secondary },
-  modalOption: {
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
-    backgroundColor: colors.glassSoft,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modalOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.iconBg,
-  },
-  modalOptionText: { flex: 1 },
-  modalOptionTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.text, fontWeight: WEIGHT.semibold },
-  modalOptionTitleActive: { color: colors.primary },
-  modalOptionHint: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginTop: 2 },
-  toast: {
-    position: 'absolute',
-    top: 14,
-    left: 16,
-    right: 16,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 30,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  toastSuccess: {
-    backgroundColor: colors.primary,
-  },
-  toastError: {
-    backgroundColor: colors.error,
-  },
-  toastText: {
-    marginLeft: 8,
-    color: colors.white,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.caption,
-    fontWeight: WEIGHT.semibold,
-    flex: 1,
-  },
-});
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: SPACING.sm + 2,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    iconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: RADIUS.sm + 2,
+      backgroundColor: c.iconBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: SPACING.md,
+    },
+    body: { flex: 1 },
+    label: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.lightText,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      fontWeight: WEIGHT.semibold,
+    },
+    value: {
+      marginTop: 2,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.text,
+      fontWeight: WEIGHT.semibold,
+    },
+    hint: {
+      marginTop: 2,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.lightText,
+    },
+  });
+
+type SettingRowProps = {
+  colors: ThemeColors;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  description: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  isLast?: boolean;
+};
+
+const SettingRow = ({ colors, icon, title, description, value, onValueChange, isLast }: SettingRowProps) => {
+  const styles = useMemo(() => settingRowStyles(colors, !!isLast), [colors, isLast]);
+  return (
+    <View style={styles.row}>
+      <View style={styles.iconWrap}>
+        <MaterialCommunityIcons name={icon} size={18} color={colors.secondary} />
+      </View>
+      <View style={styles.body}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.description}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.border, true: colors.pillBorder }}
+        thumbColor={value ? colors.primary : colors.glassSoft}
+        ios_backgroundColor={colors.border}
+        accessibilityLabel={title}
+      />
+    </View>
+  );
+};
+
+const settingRowStyles = (c: ThemeColors, isLast: boolean) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: SPACING.md - 2,
+      borderBottomWidth: isLast ? 0 : 1,
+      borderBottomColor: c.border,
+    },
+    iconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: RADIUS.sm + 2,
+      backgroundColor: c.iconBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: SPACING.md,
+    },
+    body: { flex: 1, paddingRight: SPACING.sm },
+    title: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.semibold,
+      color: c.text,
+    },
+    description: {
+      marginTop: 2,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+      lineHeight: 16,
+    },
+  });
+
+const createStyles = (c: ThemeColors, _isDark: boolean) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    content: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
+    header: {
+      alignItems: 'center',
+      backgroundColor: c.glass,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      padding: SPACING.lg + 2,
+      marginBottom: SPACING.lg,
+      ...elevation(c.shadow, 'md'),
+    },
+    avatar: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: c.iconBg,
+      borderWidth: 2,
+      borderColor: c.pillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING.sm + 2,
+      overflow: 'hidden',
+    },
+    avatarImage: { width: '100%', height: '100%' },
+    avatarBadge: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: c.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: c.glass,
+    },
+    name: { fontFamily: FONT_FAMILY, fontSize: TYPE.h2, fontWeight: WEIGHT.bold, color: c.primary },
+    email: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: c.lightText, marginTop: 4 },
+    tapHint: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: c.lightText, marginTop: 6 },
+    profileMetaRow: {
+      marginTop: SPACING.md,
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+    },
+    card: { marginBottom: SPACING.md + 2 },
+    sectionHead: { marginBottom: SPACING.md },
+    sectionBadge: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      borderRadius: RADIUS.pill,
+      backgroundColor: c.pillBg,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      marginBottom: SPACING.sm,
+      gap: 4,
+    },
+    sectionBadgeText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.primary,
+      fontWeight: WEIGHT.semibold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    sectionTitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.bold,
+      color: c.secondary,
+    },
+    sectionCaption: {
+      marginTop: 2,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+    },
+    readGroup: {},
+    fieldLabel: {
+      marginBottom: 6,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+      color: c.lightText,
+      letterSpacing: 0.2,
+    },
+    skel: { marginBottom: SPACING.md },
+    selectField: {
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      borderRadius: RADIUS.md,
+      paddingVertical: SPACING.md - 2,
+      paddingHorizontal: SPACING.md,
+      backgroundColor: c.glassSoft,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 48,
+      marginBottom: SPACING.md,
+    },
+    selectLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      flex: 1,
+    },
+    selectValue: {
+      color: c.text,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+    },
+    soilCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      padding: SPACING.md,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.pillBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      marginBottom: SPACING.md,
+    },
+    soilIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    soilTextWrap: { flex: 1 },
+    soilLabel: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.secondary,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      fontWeight: WEIGHT.semibold,
+    },
+    soilValue: {
+      marginTop: 2,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.text,
+      fontWeight: WEIGHT.semibold,
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      borderRadius: RADIUS.md,
+      backgroundColor: `${c.error}15`,
+      borderWidth: 1,
+      borderColor: `${c.error}40`,
+      marginBottom: SPACING.md,
+    },
+    errorBannerText: {
+      flex: 1,
+      fontFamily: FONT_FAMILY,
+      color: c.error,
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.semibold,
+    },
+    actionRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+    actionBtn: { flex: 1 },
+    logoutBtn: { marginTop: 2 },
+    bgAccent: {
+      position: 'absolute',
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: c.iconBg,
+      right: -80,
+      top: -60,
+      opacity: 0.5,
+    },
+  });
 
 export default ProfileScreen;

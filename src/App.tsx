@@ -1,10 +1,11 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './context/AuthContext';
 import AppNavigator from './navigation/AppNavigator';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { ToastProvider } from './components/Toast';
 
 const App = () => {
   Notifications.setNotificationHandler({
@@ -17,11 +18,13 @@ const App = () => {
     }),
   });
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ThemeProvider>
-        <AuthProvider>
-          <AppWithTheme />
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <AppWithTheme />
+          </AuthProvider>
+        </ToastProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

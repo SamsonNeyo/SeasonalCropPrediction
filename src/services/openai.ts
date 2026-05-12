@@ -8,13 +8,27 @@ type AdvisorContext = {
 };
 
 const buildContextMessage = (question: string, context?: AdvisorContext) => {
-  if (!context) return question;
   const parts = [
-    `Sub-county: ${context.subCounty || 'Bamunanika'}`,
-    `Soil type: ${context.soilType || 'Clay Loam'}`,
-    `Season: ${context.season || 'First'}`,
+    `Sub-county: ${context?.subCounty || 'Bamunanika'}`,
+    `Soil type: ${context?.soilType || 'Clay Loam'}`,
+    `Season: ${context?.season || 'First'}`,
   ];
-  return `${question}\n\nFarmer profile context:\n- ${parts.join('\n- ')}`;
+  return [
+    question.trim(),
+    '',
+    'Farmer profile context:',
+    `- ${parts.join('\n- ')}`,
+    '',
+    'Response instructions:',
+    '- Respond as SmartCrop AI Advisor, in a confident but friendly AI assistant tone.',
+    '- Answer the farmer\'s exact question first.',
+    '- Use the profile context only where it helps the answer.',
+    '- When a structured answer is useful, use these exact headings on separate lines: Short answer, What it means, Recommended actions, Watch out, Next step.',
+    '- Use short bullet points for action steps.',
+    '- Write in clear, practical English for a Luwero farmer, but make it sound like a helpful AI assistant.',
+    '- Explain technical labels or risks in simple terms if the question asks about them.',
+    '- Do not add unrelated weather, pest, or market advice unless it supports the question.',
+  ].join('\n');
 };
 
 export const getAIAdvice = async (question: string, context?: AdvisorContext): Promise<string> => {

@@ -3,255 +3,406 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   Image,
   Platform,
   Animated,
   Easing,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
+import { RADIUS, SPACING } from '../constants/spacing';
+import { elevation } from '../constants/elevation';
+
+type Feature = {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  body: string;
+};
+
+const FEATURES: Feature[] = [
+  {
+    icon: 'sprout-outline',
+    title: 'Seasonal recommendations',
+    body: 'Ranked crop choices tailored to your sub-county and current season.',
+  },
+  {
+    icon: 'weather-partly-cloudy',
+    title: 'Weather-aware guidance',
+    body: 'Planning hints that adapt to real-time field conditions.',
+  },
+  {
+    icon: 'history',
+    title: 'Decision history',
+    body: 'Review past recommendations and track your farm decisions.',
+  },
+];
 
 const WelcomeScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const contentIn = useRef(new Animated.Value(0)).current;
-  const bgFloat = useRef(new Animated.Value(0)).current;
+
+  const cardAnim    = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(0)).current;
+  const btnAnim     = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(contentIn, {
-      toValue: 1,
-      duration: 700,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(bgFloat, {
-          toValue: 1,
-          duration: 2400,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bgFloat, {
-          toValue: 0,
-          duration: 2400,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [contentIn, bgFloat]);
-
-  const contentTranslate = contentIn.interpolate({
-    inputRange: [0, 1],
-    outputRange: [16, 0],
-  });
-  const contentScale = contentIn.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.98, 1],
-  });
-  const bgShift = bgFloat.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 10],
-  });
+    Animated.stagger(140, [
+      Animated.timing(cardAnim, {
+        toValue: 1, duration: 620,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentAnim, {
+        toValue: 1, duration: 560,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(btnAnim, {
+        toValue: 1, duration: 480,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [cardAnim, contentAnim, btnAnim]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View pointerEvents="none" style={[styles.bgLeaf, { transform: [{ translateY: bgShift }] }]} />
-      <Animated.View pointerEvents="none" style={[styles.bgSun, { transform: [{ translateY: bgShift }] }]} />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.root}>
+      {/* Background orbs */}
+      <View style={[styles.orbTopRight, { pointerEvents: 'none' }]} />
+      <View style={[styles.orbBottomLeft, { pointerEvents: 'none' }]} />
+      <View style={[styles.orbMidRight, { pointerEvents: 'none' }]} />
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Glass card ── */}
         <Animated.View
           style={[
-            styles.panel,
-            { opacity: contentIn, transform: [{ translateY: contentTranslate }, { scale: contentScale }] },
+            styles.card,
+            {
+              opacity: cardAnim,
+              transform: [{
+                translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
+              }, {
+                scale: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }),
+              }],
+            },
           ]}
         >
-          <View pointerEvents="none" style={styles.cornerTopLeft} />
-          <View pointerEvents="none" style={styles.cornerBottomRight} />
-          <View style={styles.panelAccent} />
-          <View style={styles.brandColumn}>
-            <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
-            <Text style={styles.eyebrow}>Smart farming assistant</Text>
-            <Text style={styles.title}>SmartCrop</Text>
-          </View>
-          <Text style={styles.subtitle}>Seasonal crop planning for Luwero District.</Text>
-          <Text style={styles.description}>Sign in to view recommendations, planning guidance, and farm history.</Text>
+          {/* Top accent bar */}
+          <View style={styles.accentBar} />
 
-          <View style={styles.actions}>
-            <Pressable style={styles.primaryButton} onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.primaryButtonText}>Sign In</Text>
+          {/* Corner marks */}
+          <View style={[styles.cornerTL, { pointerEvents: 'none' }]} />
+          <View style={[styles.cornerBR, { pointerEvents: 'none' }]} />
+
+          {/* ── Brand section ── */}
+          <Animated.View
+            style={[
+              styles.brand,
+              {
+                opacity: contentAnim,
+                transform: [{
+                  translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+                }],
+              },
+            ]}
+          >
+            <View style={styles.logoRing}>
+              <Image
+                source={require('../../assets/splash-icon.png')}
+                style={styles.logo}
+                resizeMode="cover"
+              />
+            </View>
+
+            <Text style={styles.appName}>SmartCrop</Text>
+            <Text style={styles.tagline}>Your seasonal crop guide</Text>
+            <Text style={styles.description}>
+              Personalized recommendations for Luwero farmers backed by weather data and soil science.
+            </Text>
+          </Animated.View>
+
+          {/* ── Divider ── */}
+          <Animated.View style={[styles.dividerWrap, { opacity: contentAnim }]}>
+            <View style={styles.dividerLine} />
+          </Animated.View>
+
+          {/* ── Features ── */}
+          <Animated.View
+            style={[
+              styles.features,
+              {
+                opacity: contentAnim,
+                transform: [{
+                  translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }),
+                }],
+              },
+            ]}
+          >
+            {FEATURES.map((f) => (
+              <View key={f.title} style={styles.featureRow}>
+                <View style={styles.featureIcon}>
+                  <MaterialCommunityIcons name={f.icon} size={19} color={colors.primary} />
+                </View>
+                <View style={styles.featureText}>
+                  <Text style={styles.featureTitle}>{f.title}</Text>
+                  <Text style={styles.featureBody}>{f.body}</Text>
+                </View>
+              </View>
+            ))}
+          </Animated.View>
+
+          {/* ── Actions ── */}
+          <Animated.View
+            style={[
+              styles.actions,
+              {
+                opacity: btnAnim,
+                transform: [{
+                  translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
+                }],
+              },
+            ]}
+          >
+            <Pressable
+              style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
+              onPress={() => navigation.navigate('Signup')}
+              accessibilityRole="button"
+              accessibilityLabel="Get started"
+            >
+              <Text style={styles.btnPrimaryText}>Get Started</Text>
+              <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
             </Pressable>
 
-            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Signup')}>
-              <Text style={styles.secondaryButtonText}>Create Account</Text>
+            <Pressable
+              style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
+              onPress={() => navigation.navigate('Login')}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+            >
+              <Text style={styles.btnSecondaryText}>
+                Already have an account?{'  '}
+                <Text style={styles.btnSecondaryAccent}>Sign in</Text>
+              </Text>
             </Pressable>
-          </View>
+          </Animated.View>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    paddingVertical: 20,
-  },
-  panel: {
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 460 : undefined,
-    backgroundColor: colors.glass,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    paddingHorizontal: 24,
-    paddingVertical: 26,
-    alignSelf: 'center',
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.12,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
-  },
-  panelAccent: {
-    width: 56,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: colors.accent,
-    alignSelf: 'center',
-    marginBottom: 18,
-    opacity: 0.9,
-  },
-  cornerTopLeft: {
-    position: 'absolute',
-    top: 18,
-    left: 18,
-    width: 26,
-    height: 26,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-    borderColor: colors.primary,
-    borderTopLeftRadius: 14,
-    opacity: 0.9,
-  },
-  cornerBottomRight: {
-    position: 'absolute',
-    right: 18,
-    bottom: 18,
-    width: 26,
-    height: 26,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    borderColor: colors.primary,
-    borderBottomRightRadius: 14,
-    opacity: 0.9,
-  },
-  brandColumn: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  logo: {
-    width: 92,
-    height: 92,
-    marginBottom: 14,
-  },
-  eyebrow: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.caption,
-    fontWeight: WEIGHT.semibold,
-    color: colors.secondary,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  title: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.display,
-    fontWeight: WEIGHT.bold,
-    color: colors.primary,
-    letterSpacing: 0.3,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.body,
-    fontWeight: WEIGHT.semibold,
-    color: colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  description: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.bodySmall,
-    color: colors.lightText,
-    marginBottom: 28,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  actions: {
-    width: '100%',
-  },
-  primaryButton: {
-    width: '100%',
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  primaryButtonText: {
-    fontFamily: FONT_FAMILY,
-    color: colors.white,
-    fontSize: TYPE.body,
-    fontWeight: WEIGHT.semibold,
-  },
-  secondaryButton: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-  },
-  secondaryButtonText: {
-    fontFamily: FONT_FAMILY,
-    color: colors.primary,
-    fontSize: TYPE.body,
-    fontWeight: WEIGHT.semibold,
-  },
-  bgLeaf: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: colors.iconBg,
-    left: -95,
-    top: -70,
-    opacity: 0.85,
-  },
-  bgSun: {
-    position: 'absolute',
-    width: 230,
-    height: 230,
-    borderRadius: 115,
-    backgroundColor: colors.pillBg,
-    right: -70,
-    bottom: -50,
-    opacity: 0.85,
-  },
-});
+    root: { flex: 1, backgroundColor: c.background },
+
+    // Background orbs
+    orbTopRight: {
+      position: 'absolute',
+      width: 280,
+      height: 280,
+      borderRadius: 140,
+      backgroundColor: c.iconBg,
+      top: -80,
+      right: -80,
+      opacity: 0.9,
+    },
+    orbBottomLeft: {
+      position: 'absolute',
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: c.pillBg,
+      bottom: -60,
+      left: -70,
+      opacity: 0.85,
+    },
+    orbMidRight: {
+      position: 'absolute',
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: c.iconBg,
+      top: '45%',
+      right: -40,
+      opacity: 0.5,
+    },
+
+    scroll: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: SPACING.xxl,
+      paddingVertical: SPACING.xl,
+    },
+
+    // Glass card
+    card: {
+      width: '100%',
+      maxWidth: Platform.OS === 'web' ? 480 : undefined,
+      alignSelf: 'center',
+      backgroundColor: c.glass,
+      borderRadius: RADIUS.xxl,
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      paddingHorizontal: SPACING.xxl,
+      paddingVertical: SPACING.xxl + 4,
+      ...elevation(c.shadow, 'xl'),
+    },
+
+    // Accent bar at top of card
+    accentBar: {
+      width: 52,
+      height: 4,
+      borderRadius: RADIUS.pill,
+      backgroundColor: c.primary,
+      alignSelf: 'center',
+      marginBottom: SPACING.lg,
+      opacity: 0.85,
+    },
+
+    // Corner marks
+    cornerTL: {
+      position: 'absolute',
+      top: 16,
+      left: 16,
+      width: 24,
+      height: 24,
+      borderTopWidth: 2,
+      borderLeftWidth: 2,
+      borderColor: c.primary,
+      borderTopLeftRadius: 12,
+      opacity: 0.7,
+    },
+    cornerBR: {
+      position: 'absolute',
+      bottom: 16,
+      right: 16,
+      width: 24,
+      height: 24,
+      borderBottomWidth: 2,
+      borderRightWidth: 2,
+      borderColor: c.primary,
+      borderBottomRightRadius: 12,
+      opacity: 0.7,
+    },
+
+    // Brand
+    brand: { alignItems: 'center', marginBottom: SPACING.lg },
+    logoRing: {
+      width: 92,
+      height: 92,
+      borderRadius: 24,
+      overflow: 'hidden',
+      marginBottom: SPACING.md,
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      ...elevation(c.shadow, 'sm'),
+    },
+    logo: { width: '100%', height: '100%' },
+
+    appName: {
+      fontFamily: FONT_FAMILY,
+      fontSize: 30,
+      fontWeight: WEIGHT.bold,
+      color: c.primary,
+      letterSpacing: 0.4,
+      marginBottom: 6,
+    },
+    tagline: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.semibold,
+      color: c.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    description: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+      textAlign: 'center',
+      lineHeight: 21,
+      maxWidth: 300,
+    },
+
+    // Divider
+    dividerWrap: { marginVertical: SPACING.lg },
+    dividerLine: {
+      height: 1,
+      backgroundColor: c.glassBorder,
+    },
+
+    // Features
+    features: { gap: SPACING.md, marginBottom: SPACING.xl },
+    featureRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: SPACING.md,
+    },
+    featureIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 11,
+      backgroundColor: c.iconBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    featureText: { flex: 1, paddingTop: 1 },
+    featureTitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.bold,
+      color: c.text,
+      marginBottom: 3,
+    },
+    featureBody: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+      lineHeight: 18,
+    },
+
+    // Actions
+    actions: { gap: SPACING.md },
+    btnPrimary: {
+      height: 54,
+      backgroundColor: c.primary,
+      borderRadius: RADIUS.pill,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+    },
+    btnPrimaryText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.bold,
+      color: '#fff',
+      letterSpacing: 0.2,
+    },
+    btnSecondary: {
+      alignItems: 'center',
+      paddingVertical: SPACING.sm,
+    },
+    btnSecondaryText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+    },
+    btnSecondaryAccent: {
+      color: c.primary,
+      fontWeight: WEIGHT.bold,
+    },
+  });
 
 export default WelcomeScreen;

@@ -7,62 +7,57 @@ import {
   StyleSheet,
   Image,
   Pressable,
-  ActivityIndicator,
   Platform,
   Animated,
   Easing,
   ScrollView,
+  KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
+import { RADIUS, SPACING } from '../constants/spacing';
 import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { login, resetPassword } = useAuth();
+  const { login, loginWithGoogle, googleAuthSupported } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
-  const headerIn = useRef(new Animated.Value(0)).current;
-  const cardIn = useRef(new Animated.Value(0)).current;
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
-    Animated.stagger(140, [
-      Animated.timing(headerIn, {
-        toValue: 1,
-        duration: 600,
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1, duration: 480,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.timing(cardIn, {
-        toValue: 1,
-        duration: 600,
+      Animated.timing(slideAnim, {
+        toValue: 0, duration: 480,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
-  }, [headerIn, cardIn]);
+  }, [fadeAnim, slideAnim]);
 
   const handleLogin = async () => {
+    if (!email.trim() || !password) { setError('Email and password are required.'); return; }
     try {
       setError('');
-      setInfo('');
-      if (!email.trim() || !password) {
-        setError('Email and password are required.');
-        return;
-      }
       setLoading(true);
       await login(email.trim(), password);
-      if (rememberMe) {
-        setInfo('You will stay signed in on this device.');
-      }
     } catch (e: any) {
       setError(e?.message || 'Login failed');
     } finally {
@@ -70,309 +65,314 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleGoogleLogin = async () => {
     try {
       setError('');
-      setInfo('');
-      if (!email.trim()) {
-        setError('Enter your email to reset your password.');
-        return;
-      }
-      setLoading(true);
-      await resetPassword(email.trim());
-      setInfo('If an account exists for this email, a reset link has been sent.');
+      setGoogleLoading(true);
+      await loginWithGoogle();
     } catch (e: any) {
-      setError(e?.message || 'Could not send reset email');
+      const msg = e?.message || 'Google sign-in failed.';
+      if (!/cancel/i.test(msg)) setError(msg);
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
-  const disableLogin = loading || !email.trim() || !password;
-
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.bgOrbOne} />
-      <View style={styles.bgOrbTwo} />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Animated.View
-          style={[
-            styles.panel,
-            {
-              opacity: cardIn,
-              transform: [
-                {
-                  translateY: cardIn.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [18, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
+    <SafeAreaView style={styles.root}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <View pointerEvents="none" style={styles.cornerTopLeft} />
-          <View pointerEvents="none" style={styles.cornerBottomRight} />
-          <View style={styles.panelAccent} />
           <Animated.View
-            style={[
-              styles.header,
-              {
-                opacity: headerIn,
-                transform: [
-                  {
-                    translateY: headerIn.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [14, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
+            style={[styles.inner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
           >
-            <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
-            <Text style={styles.eyebrow}>SmartCrop</Text>
-            <Text style={styles.title}>Sign In</Text>
-            <Text style={styles.subtitle}>Access your account to continue.</Text>
-          </Animated.View>
+            {/* ── Brand ── */}
+            <View style={styles.brand}>
+              <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
+              <Text style={styles.title}>Welcome back</Text>
+              <Text style={styles.subtitle}>Sign in to your SmartCrop account</Text>
+            </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={colors.lightText}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <View style={styles.passwordRow}>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="Password"
-              placeholderTextColor={colors.lightText}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="password"
-              autoComplete="password"
-              value={password}
-              onChangeText={setPassword}
-            />
-            <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
-              <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.rowBetween}>
-            <Pressable
-              style={styles.checkboxRow}
-              onPress={() => setRememberMe(!rememberMe)}
-              hitSlop={6}
-            >
-              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                {rememberMe && <MaterialCommunityIcons name="check" size={12} color={colors.white} />}
+            {/* ── Email ── */}
+            <View style={styles.field}>
+              <Text style={styles.label}>Email address</Text>
+              <View style={styles.inputRow}>
+                <MaterialCommunityIcons name="email-outline" size={18} color={colors.lightText} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email address"
+                  placeholderTextColor={colors.lightText}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  value={email}
+                  onChangeText={setEmail}
+                />
               </View>
-              <Text style={styles.checkboxText}>Remember me</Text>
-            </Pressable>
-            <TouchableOpacity onPress={handleResetPassword}>
-              <Text style={styles.linkInline}>Forgot password?</Text>
+            </View>
+
+            {/* ── Password ── */}
+            <View style={styles.field}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.inputRow}>
+                <MaterialCommunityIcons name="lock-outline" size={18} color={colors.lightText} />
+                <TextInput
+                  style={[styles.input, styles.inputFlex]}
+                  placeholder="Enter your password"
+                  placeholderTextColor={colors.lightText}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="password"
+                  autoComplete="password"
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <Pressable onPress={() => setShowPassword(v => !v)} hitSlop={10}>
+                  <MaterialCommunityIcons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={18}
+                    color={colors.lightText}
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {/* ── Forgot ── */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ForgotPassword', { email: email.trim() })}
+              style={styles.forgotRow}
+              hitSlop={8}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
-          </View>
 
-          {!!error && <Text style={styles.error}>{error}</Text>}
-          {!!info && <Text style={styles.info}>{info}</Text>}
+            {/* ── Error ── */}
+            {!!error && (
+              <View style={styles.errorBox}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={15} color={colors.error} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
 
-          <TouchableOpacity
-            style={[styles.primaryButton, disableLogin && styles.primaryButtonDisabled]}
-            onPress={handleLogin}
-            disabled={disableLogin}
-          >
-            {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Sign In</Text>}
-          </TouchableOpacity>
+            {/* ── Sign In ── */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.btn,
+                (!email.trim() || !password) && styles.btnMuted,
+                pressed && { opacity: 0.88 },
+              ]}
+              onPress={handleLogin}
+              disabled={loading || !email.trim() || !password}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.btnText}>Sign In</Text>
+              }
+            </Pressable>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-            <Text style={styles.link}>New here? Create an account</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
+            {/* ── Google ── */}
+            {googleAuthSupported && (
+              <>
+                <View style={styles.divider}>
+                  <View style={styles.divLine} />
+                  <Text style={styles.divText}>Or</Text>
+                  <View style={styles.divLine} />
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.82 }]}
+                  onPress={handleGoogleLogin}
+                  disabled={googleLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with Google"
+                >
+                  {googleLoading
+                    ? <ActivityIndicator color={colors.text} size="small" />
+                    : (
+                      <>
+                        <MaterialCommunityIcons name="google" size={20} color="#EA4335" />
+                        <Text style={styles.googleText}>Continue with Google</Text>
+                      </>
+                    )
+                  }
+                </Pressable>
+              </>
+            )}
+
+            {/* ── Create account ── */}
+            <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={styles.footer}>
+              <Text style={styles.footerText}>
+                Don't have an account?{'  '}
+                <Text style={styles.footerAccent}>Sign up</Text>
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContent: {
+    root: { flex: 1, backgroundColor: c.background },
+    flex: { flex: 1 },
+    scroll: {
       flexGrow: 1,
-      padding: 24,
-      paddingVertical: 20,
       justifyContent: 'center',
-      alignItems: 'center',
+      paddingHorizontal: SPACING.xxl,
+      paddingVertical: SPACING.xxl,
     },
-    panel: {
+    inner: {
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 420 : undefined,
-      backgroundColor: colors.glass,
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      paddingHorizontal: 22,
-      paddingVertical: 24,
       alignSelf: 'center',
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.12,
-      shadowRadius: 22,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 4,
     },
-    panelAccent: {
-      width: 48,
-      height: 4,
-      borderRadius: 999,
-      backgroundColor: colors.accent,
-      alignSelf: 'center',
-      marginBottom: 18,
-      opacity: 0.9,
-    },
-    cornerTopLeft: {
-      position: 'absolute',
-      top: 18,
-      left: 18,
-      width: 26,
-      height: 26,
-      borderTopWidth: 2,
-      borderLeftWidth: 2,
-      borderColor: colors.primary,
-      borderTopLeftRadius: 14,
-      opacity: 0.9,
-    },
-    cornerBottomRight: {
-      position: 'absolute',
-      right: 18,
-      bottom: 18,
-      width: 26,
-      height: 26,
-      borderBottomWidth: 2,
-      borderRightWidth: 2,
-      borderColor: colors.primary,
-      borderBottomRightRadius: 14,
-      opacity: 0.9,
-    },
-    header: {
-      alignItems: 'center',
-      marginBottom: 28,
-    },
-    logo: {
-      width: 84,
-      height: 84,
-      marginBottom: 12,
-    },
-    eyebrow: {
+
+    // Brand
+    brand: { alignItems: 'center', marginBottom: SPACING.xl + 8 },
+    logo: { width: 76, height: 76, borderRadius: 20, marginBottom: SPACING.md },
+    title: {
       fontFamily: FONT_FAMILY,
-      color: colors.secondary,
-      fontSize: TYPE.caption,
-      fontWeight: WEIGHT.semibold,
-      letterSpacing: 0.4,
-      textTransform: 'uppercase',
+      fontSize: 26,
+      fontWeight: WEIGHT.bold,
+      color: c.text,
+      textAlign: 'center',
       marginBottom: 6,
     },
-    title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
-    subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 6, textAlign: 'center' },
-    input: {
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 11,
-      marginBottom: 11,
-      backgroundColor: colors.glassSoft,
-      color: colors.text,
+    subtitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+      textAlign: 'center',
+    },
+
+    // Fields
+    field: { marginBottom: SPACING.md },
+    label: {
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.body,
-    },
-    passwordRow: {
-      position: 'relative',
-    },
-    passwordInput: {
-      paddingRight: 64,
-    },
-    passwordToggle: {
-      position: 'absolute',
-      right: 12,
-      top: 13,
-      padding: 4,
-    },
-    passwordToggleText: {
-      fontFamily: FONT_FAMILY,
-      color: colors.secondary,
       fontWeight: WEIGHT.semibold,
-      fontSize: TYPE.caption,
+      color: c.text,
+      marginBottom: 8,
     },
-    rowBetween: {
+    inputRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 12,
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      paddingHorizontal: SPACING.md,
+      height: 54,
+      gap: SPACING.sm,
     },
-    checkboxRow: {
+    input: {
+      flex: 1,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      color: c.text,
+      height: '100%',
+      ...(Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } as any : {}),
+    },
+    inputFlex: { flex: 1 },
+
+    // Forgot
+    forgotRow: { alignItems: 'flex-end', marginTop: -4, marginBottom: SPACING.lg },
+    forgotText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.primary,
+      fontWeight: WEIGHT.semibold,
+    },
+
+    // Error
+    errorBox: {
       flexDirection: 'row',
       alignItems: 'center',
-    },
-    checkbox: {
-      width: 20,
-      height: 20,
-      borderRadius: 6,
+      gap: SPACING.sm,
+      paddingVertical: 10,
+      paddingHorizontal: SPACING.md,
+      borderRadius: RADIUS.md,
+      backgroundColor: `${c.error}12`,
       borderWidth: 1,
-      borderColor: colors.glassBorder,
-      marginRight: 8,
-      backgroundColor: colors.surface,
+      borderColor: `${c.error}30`,
+      marginBottom: SPACING.md,
+    },
+    errorText: {
+      flex: 1,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.error,
+      fontWeight: WEIGHT.semibold,
+    },
+
+    // Primary button
+    btn: {
+      height: 54,
+      backgroundColor: c.primary,
+      borderRadius: RADIUS.pill,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    checkboxChecked: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    checkboxText: {
+    btnMuted: { opacity: 0.5 },
+    btnText: {
       fontFamily: FONT_FAMILY,
-      color: colors.text,
-      fontSize: TYPE.bodySmall,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.bold,
+      color: '#fff',
+      letterSpacing: 0.2,
     },
-    error: { fontFamily: FONT_FAMILY, color: colors.error, marginBottom: 10, fontSize: TYPE.bodySmall },
-    info: { fontFamily: FONT_FAMILY, color: colors.secondary, marginBottom: 10, fontSize: TYPE.bodySmall },
-    primaryButton: {
-      backgroundColor: colors.primary,
-      paddingVertical: 13,
-      borderRadius: 12,
+
+    // Divider
+    divider: {
+      flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 6,
+      gap: SPACING.sm,
+      marginVertical: SPACING.lg,
     },
-    primaryButtonDisabled: { backgroundColor: '#9DBA9D' },
-    primaryButtonText: { fontFamily: FONT_FAMILY, color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body },
-    link: { fontFamily: FONT_FAMILY, color: colors.secondary, marginTop: 14, textAlign: 'center', fontSize: TYPE.bodySmall },
-    linkInline: { fontFamily: FONT_FAMILY, color: colors.secondary, fontSize: TYPE.caption },
-    bgOrbOne: {
-      position: 'absolute',
-      width: 240,
-      height: 240,
-      borderRadius: 120,
-      backgroundColor: colors.iconBg,
-      top: -60,
-      right: -80,
-      opacity: 0.9,
+    divLine: { flex: 1, height: 1, backgroundColor: c.border },
+    divText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
     },
-    bgOrbTwo: {
-      position: 'absolute',
-      width: 220,
-      height: 220,
-      borderRadius: 110,
-      backgroundColor: colors.pillBg,
-      bottom: -60,
-      left: -70,
-      opacity: 0.8,
+
+    // Google
+    googleBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+      height: 54,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      backgroundColor: c.background,
+      marginBottom: SPACING.lg,
+    },
+    googleText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.semibold,
+      color: c.text,
+    },
+
+    // Footer
+    footer: { alignItems: 'center', paddingVertical: SPACING.sm },
+    footerText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+    },
+    footerAccent: {
+      color: c.primary,
+      fontWeight: WEIGHT.bold,
     },
   });
 

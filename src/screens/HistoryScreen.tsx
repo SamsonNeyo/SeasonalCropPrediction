@@ -4,29 +4,38 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   Easing,
-  Modal,
-  Pressable,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useScrollToTop } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
+import { RADIUS, SPACING } from '../constants/spacing';
+import { elevation } from '../constants/elevation';
 import { deleteHistoryItem, getUserHistory } from '../services/firestore';
 import { QueryDocumentSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import Card from '../components/Card';
+import Chip from '../components/Chip';
+import Button from '../components/Button';
+import IconButton from '../components/IconButton';
+import EmptyState from '../components/EmptyState';
+import Skeleton, { SkeletonGroup } from '../components/Skeleton';
+import SelectSheet, { SelectOption } from '../components/SelectSheet';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../components/Toast';
 
 const HistoryScreen = () => {
   const PAGE_SIZE = 50;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
+  const toast = useToast();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,6 +49,7 @@ const HistoryScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const headerIn = useRef(new Animated.Value(0)).current;
   const listIn = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
@@ -70,11 +80,17 @@ const HistoryScreen = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      setDeleting(true);
       await deleteHistoryItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
+      toast.show({ message: 'Record deleted.', tone: 'success' });
     } catch (e: any) {
       const msg = e?.code || e?.message || 'Delete failed.';
-      setError(`Could not delete history: ${msg}`);
+      toast.show({ message: `Could not delete: ${msg}`, tone: 'error' });
+    } finally {
+      setDeleting(false);
+      setConfirmOpen(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -180,12 +196,28 @@ const HistoryScreen = () => {
       return true;
     });
   }, [items, filterSeason, filterYear]);
+
   const summary = useMemo(() => {
     const total = items.length;
     const shown = filteredItems.length;
     const hidden = Math.max(total - shown, 0);
     return { total, shown, hidden };
   }, [filteredItems, items.length]);
+
+  const yearOptions: SelectOption<number | 'all'>[] = useMemo(
+    () => [
+      { label: 'All years', value: 'all' as const },
+      ...years.map((y) => ({ label: String(y), value: y })),
+    ],
+    [years],
+  );
+
+  const seasonOptions: SelectOption<'all' | 'First' | 'Second'>[] = [
+    { label: 'All seasons', value: 'all' },
+    ...months.map((m) => ({ label: m.label, value: m.value })),
+  ];
+
+  const filtersActive = filterYear !== 'all' || filterSeason !== 'all';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -194,7 +226,9 @@ const HistoryScreen = () => {
         ref={scrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+        }
       >
         <Animated.View
           style={[
@@ -202,12 +236,7 @@ const HistoryScreen = () => {
             {
               opacity: headerIn,
               transform: [
-                {
-                  translateY: headerIn.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [12, 0],
-                  }),
-                },
+                { translateY: headerIn.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
               ],
             },
           ]}
@@ -219,24 +248,36 @@ const HistoryScreen = () => {
             <Text style={styles.title}>History</Text>
             <Text style={styles.subtitle}>Your recent predictions and manual analyses</Text>
           </View>
-          <TouchableOpacity onPress={loadHistory} style={styles.refreshButton}>
-            <MaterialCommunityIcons name="refresh" size={18} color={colors.primary} />
-          </TouchableOpacity>
+          <IconButton
+            icon="refresh"
+            onPress={loadHistory}
+            variant="soft"
+            size="md"
+            accessibilityLabel="Refresh history"
+          />
         </Animated.View>
 
-        <View style={styles.filterCard}>
-          <Text style={styles.filterTitle}>Filter by date</Text>
+        <Card variant="glass" padding="lg" emphasis="md" style={styles.filterCard}>
+          <Text style={styles.filterTitle}>Filter</Text>
           <View style={styles.filterRow}>
-            <TouchableOpacity style={styles.filterField} onPress={() => setYearOpen(true)}>
+            <TouchableOpacity
+              style={styles.filterField}
+              onPress={() => setYearOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Year filter, currently ${filterYear === 'all' ? 'all years' : filterYear}`}
+            >
               <Text style={styles.filterLabel}>Year</Text>
               <View style={styles.filterValueRow}>
-                <Text style={styles.filterValue}>
-                  {filterYear === 'all' ? 'All' : String(filterYear)}
-                </Text>
+                <Text style={styles.filterValue}>{filterYear === 'all' ? 'All' : String(filterYear)}</Text>
                 <MaterialCommunityIcons name="chevron-down" size={18} color={colors.lightText} />
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.filterField} onPress={() => setSeasonOpen(true)}>
+            <TouchableOpacity
+              style={styles.filterField}
+              onPress={() => setSeasonOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Season filter, currently ${filterSeason === 'all' ? 'all seasons' : filterSeason}`}
+            >
               <Text style={styles.filterLabel}>Season</Text>
               <View style={styles.filterValueRow}>
                 <Text style={styles.filterValue}>
@@ -248,37 +289,40 @@ const HistoryScreen = () => {
               </View>
             </TouchableOpacity>
           </View>
-          {(filterYear !== 'all' || filterSeason !== 'all') && (
-            <TouchableOpacity
-              style={styles.clearButton}
+          {filtersActive && (
+            <Button
+              label="Clear filters"
+              variant="ghost"
+              size="sm"
               onPress={() => {
                 setFilterYear('all');
                 setFilterSeason('all');
               }}
-            >
-              <Text style={styles.clearButtonText}>Clear filters</Text>
-            </TouchableOpacity>
+              leftIcon={<MaterialCommunityIcons name="filter-remove-outline" size={14} color={colors.secondary} />}
+              style={styles.clearBtn}
+              accessibilityLabel="Clear filters"
+            />
           )}
-        </View>
+        </Card>
 
         <View style={styles.summaryWrap}>
           <View style={styles.summaryHeroCard}>
             <View style={styles.summaryHeroTop}>
               <Text style={styles.summaryHeroLabel}>Showing</Text>
-              <View style={styles.summaryHeroPill}>
-                <MaterialCommunityIcons name="filter-variant" size={12} color={colors.secondary} />
-                <Text style={styles.summaryHeroPillText}>
-                  {filterYear === 'all' && filterSeason === 'all' ? 'No active filters' : 'Filters active'}
-                </Text>
-              </View>
+              <Chip
+                label={filtersActive ? 'Filters active' : 'No filters'}
+                tone={filtersActive ? 'info' : 'neutral'}
+                size="sm"
+                icon={filtersActive ? 'filter-variant' : 'filter-outline'}
+              />
             </View>
             <Text style={styles.summaryHeroValue}>
               {summary.shown} <Text style={styles.summaryHeroSub}>of {summary.total}</Text>
             </Text>
             <Text style={styles.summaryHeroHint}>
               {summary.hidden > 0
-                ? `${summary.hidden} logs hidden by current filters`
-                : 'All logs are currently shown'}
+                ? `${summary.hidden} record${summary.hidden === 1 ? '' : 's'} hidden by current filters`
+                : 'All records are currently shown'}
             </Text>
           </View>
         </View>
@@ -289,571 +333,303 @@ const HistoryScreen = () => {
             {
               opacity: listIn,
               transform: [
-                {
-                  translateY: listIn.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [16, 0],
-                  }),
-                },
+                { translateY: listIn.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
               ],
             },
           ]}
         >
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} />
-        ) : !user ? (
-          <View style={styles.emptyBox}>
-            <MaterialCommunityIcons name="account-alert-outline" size={26} color={colors.lightText} />
-            <Text style={styles.emptyText}>Please sign in to view your history.</Text>
-          </View>
-        ) : error ? (
-          <Text style={styles.error}>{error}</Text>
-        ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <MaterialCommunityIcons name="clipboard-text-outline" size={26} color={colors.lightText} />
-            <Text style={styles.emptyText}>
-              {items.length === 0 ? 'No records yet. Your history will appear here.' : 'No records match your filter.'}
-            </Text>
-          </View>
-        ) : (
-          filteredItems.map((item) => (
-            <View key={item.id} style={styles.card}>
-                <View style={styles.cardRow}>
-                  <View style={styles.cardIcon}>
-                    <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
-                  </View>
-                  <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>
-                    {item.sub_county || 'Luwero'} - {normalizeSeason(item.season) || 'Season'}
-                  </Text>
-                  <Text style={styles.cardSub}>
-                    {item.soil_type || 'Mapped soil'} - {item.temperature ?? '-'} C - {item.rainfall ?? '-'} mm
-                  </Text>
-                </View>
-                  <TouchableOpacity onPress={() => confirmDelete(item.id)} style={styles.deleteBtn}>
-                    <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.error} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.recRow}>
-                  {(item.recommendations || []).slice(0, 3).map((rec: any, idx: number) => (
-                    <View key={idx} style={styles.recChip}>
-                      <Text style={styles.recChipText}>{rec.crop}</Text>
+          {loading ? (
+            <SkeletonGroup style={styles.skel}>
+              <Skeleton height={108} borderRadius={RADIUS.lg} />
+              <Skeleton height={108} borderRadius={RADIUS.lg} />
+              <Skeleton height={108} borderRadius={RADIUS.lg} />
+            </SkeletonGroup>
+          ) : !user ? (
+            <EmptyState
+              icon="account-alert-outline"
+              title="Sign in to see your history"
+              description="Your saved predictions and analyses will appear here once you sign in."
+            />
+          ) : error ? (
+            <EmptyState
+              icon="cloud-off-outline"
+              variant="error"
+              title="Could not load history"
+              description={error}
+              actionLabel="Try again"
+              onAction={loadHistory}
+            />
+          ) : filteredItems.length === 0 ? (
+            <EmptyState
+              icon={items.length === 0 ? 'clipboard-text-outline' : 'filter-variant-remove'}
+              title={items.length === 0 ? 'No records yet' : 'No records match your filter'}
+              description={
+                items.length === 0
+                  ? 'Run an analysis from Home or Manual analysis to start building your history.'
+                  : 'Try clearing filters to see all records.'
+              }
+              actionLabel={items.length === 0 ? undefined : 'Clear filters'}
+              onAction={
+                items.length === 0
+                  ? undefined
+                  : () => {
+                      setFilterYear('all');
+                      setFilterSeason('all');
+                    }
+              }
+            />
+          ) : (
+            filteredItems.map((item) => {
+              const itemDate = getItemDate(item);
+              return (
+                <View key={item.id} style={styles.card}>
+                  <View style={styles.cardRow}>
+                    <View style={styles.cardIcon}>
+                      <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
                     </View>
-                  ))}
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>
+                        {item.sub_county || 'Luwero'} · {normalizeSeason(item.season) || 'Season'}
+                      </Text>
+                      <Text style={styles.cardSub}>
+                        {item.soil_type || 'Mapped soil'} · {item.temperature ?? '—'}°C · {item.rainfall ?? '—'} mm
+                      </Text>
+                    </View>
+                    <IconButton
+                      icon="trash-can-outline"
+                      onPress={() => confirmDelete(item.id)}
+                      variant="danger"
+                      size="sm"
+                      accessibilityLabel="Delete record"
+                    />
+                  </View>
+
+                  <View style={styles.recRow}>
+                    {(item.recommendations || []).slice(0, 3).map((rec: any, idx: number) => (
+                      <Chip key={idx} label={rec.crop} size="sm" tone="success" />
+                    ))}
+                  </View>
+                  {!!itemDate && (
+                    <Text style={styles.timestampText}>
+                      <MaterialCommunityIcons name="clock-outline" size={11} color={colors.lightText} />{' '}
+                      {itemDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </Text>
+                  )}
                 </View>
-                {!!getItemDate(item) && (
-                  <Text style={styles.timestampText}>
-                    {getItemDate(item)?.toLocaleDateString()}
-                  </Text>
-                )}
-              </View>
-            ))
+              );
+            })
           )}
+
           {hasMore && items.length > 0 && !loading && !error && (
-            <TouchableOpacity
+            <Button
+              label={loadingMore ? 'Loading…' : 'Load more'}
+              variant="tertiary"
+              size="sm"
               onPress={handleLoadMore}
+              loading={loadingMore}
               style={styles.loadMoreBtn}
-              disabled={loadingMore}
-            >
-              {loadingMore ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={styles.loadMoreText}>Load more</Text>
-              )}
-            </TouchableOpacity>
+              accessibilityLabel="Load more history"
+            />
           )}
         </Animated.View>
       </ScrollView>
 
-      <SelectModal
+      <SelectSheet
         visible={yearOpen}
-        title="Select year"
         onClose={() => setYearOpen(false)}
-        options={[
-          { label: 'All years', value: 'all' },
-          ...years.map((y) => ({ label: String(y), value: y })),
-        ]}
+        title="Filter by year"
+        options={yearOptions}
         value={filterYear}
         onSelect={(value) => {
           setFilterYear(value as number | 'all');
           setYearOpen(false);
         }}
-        styles={styles}
-        colors={colors}
       />
-      <SelectModal
+      <SelectSheet
         visible={seasonOpen}
-        title="Select season"
         onClose={() => setSeasonOpen(false)}
-        options={[
-          { label: 'All seasons', value: 'all' },
-          ...months.map((m) => ({ label: m.label, value: m.value })),
-        ]}
+        title="Filter by season"
+        options={seasonOptions}
         value={filterSeason}
         onSelect={(value) => {
           setFilterSeason(value as 'all' | 'First' | 'Second');
           setSeasonOpen(false);
         }}
-        styles={styles}
-        colors={colors}
       />
-      <ConfirmModal
+      <ConfirmDialog
         visible={confirmOpen}
-        title="Delete history item?"
-        message="Do you want to delete this record?"
+        title="Delete this record?"
+        message="This will remove the record from your history. This cannot be undone."
         onCancel={() => {
           setConfirmOpen(false);
           setPendingDeleteId(null);
         }}
         onConfirm={() => {
-          if (!pendingDeleteId) return;
-          handleDelete(pendingDeleteId);
-          setConfirmOpen(false);
-          setPendingDeleteId(null);
+          if (pendingDeleteId) handleDelete(pendingDeleteId);
         }}
-        styles={styles}
+        confirmLabel="Delete"
+        destructive
+        loading={deleting}
+        icon="trash-can-outline"
       />
     </SafeAreaView>
   );
 };
 
-type SelectOption = {
-  label: string;
-  value: number | 'all' | 'First' | 'Second';
-};
-
-const SelectModal = ({
-  visible,
-  title,
-  onClose,
-  options,
-  value,
-  onSelect,
-  styles,
-  colors,
-}: {
-  visible: boolean;
-  title: string;
-  onClose: () => void;
-  options: SelectOption[];
-  value: number | 'all' | 'First' | 'Second';
-  onSelect: (value: number | 'all' | 'First' | 'Second') => void;
-  styles: any;
-  colors: any;
-}) => {
-  const slide = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.timing(slide, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    } else {
-      slide.setValue(0);
-    }
-  }, [visible, slide]);
-
-  const translateY = slide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [24, 0],
-  });
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <Animated.View style={[styles.modalCard, { transform: [{ translateY }] }]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={20} color={colors.lightText} />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={options}
-            keyExtractor={(opt) => String(opt.value)}
-            style={styles.modalList}
-            contentContainerStyle={styles.modalOptions}
-            showsVerticalScrollIndicator={false}
-            nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item: opt }) => {
-              const selected = opt.value === value;
-              return (
-                <TouchableOpacity
-                  key={String(opt.value)}
-                  style={[styles.modalOption, selected && styles.modalOptionActive]}
-                  onPress={() => onSelect(opt.value)}
-                >
-                  <Text style={[styles.modalLabel, selected && styles.modalLabelActive]}>{opt.label}</Text>
-                  {selected && <MaterialCommunityIcons name="check" size={18} color={colors.primary} />}
-                </TouchableOpacity>
-              );
-            }}
-            ListEmptyComponent={<Text style={styles.modalEmpty}>No options available.</Text>}
-          />
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-};
-
-const ConfirmModal = ({
-  visible,
-  title,
-  message,
-  onCancel,
-  onConfirm,
-  styles,
-}: {
-  visible: boolean;
-  title: string;
-  message: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-  styles: any;
-}) => {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={styles.confirmOverlay}>
-        <Pressable style={styles.confirmBackdrop} onPress={onCancel} />
-        <View style={styles.confirmCard}>
-          <Text style={styles.confirmTitle}>{title}</Text>
-          <Text style={styles.confirmText}>{message}</Text>
-          <View style={styles.confirmActions}>
-            <TouchableOpacity style={styles.confirmButton} onPress={onCancel}>
-              <Text style={styles.confirmButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.confirmButton, styles.confirmDeleteButton]} onPress={onConfirm}>
-              <Text style={[styles.confirmButtonText, styles.confirmDeleteText]}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
-const createStyles = (colors: any) =>
+const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 24 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerText: { flex: 1 },
-  title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
-  subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, color: colors.lightText, marginTop: 2 },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  error: { fontFamily: FONT_FAMILY, color: colors.error, textAlign: 'center', marginTop: 12, fontSize: TYPE.bodySmall },
-  emptyBox: {
-    backgroundColor: colors.glass,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  emptyText: { fontFamily: FONT_FAMILY, color: colors.lightText, marginTop: 8, textAlign: 'center', fontSize: TYPE.bodySmall },
-  filterCard: {
-    backgroundColor: colors.glass,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    padding: 14,
-    marginBottom: 12,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  summaryWrap: {
-    marginBottom: 12,
-    gap: 8,
-  },
-  summaryHeroCard: {
-    backgroundColor: colors.pillBg,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-    paddingVertical: 10,
-    paddingHorizontal: 11,
-  },
-  summaryHeroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  summaryHeroLabel: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.caption,
-    color: colors.secondary,
-    fontWeight: WEIGHT.semibold,
-  },
-  summaryHeroPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-    borderRadius: 999,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
-    backgroundColor: colors.surface,
-  },
-  summaryHeroPillText: {
-    marginLeft: 4,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.tiny,
-    color: colors.secondary,
-    fontWeight: WEIGHT.semibold,
-  },
-  summaryHeroValue: {
-    marginTop: 6,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.h2,
-    color: colors.primary,
-    fontWeight: WEIGHT.bold,
-  },
-  summaryHeroSub: {
-    fontSize: TYPE.bodySmall,
-    color: colors.secondary,
-    fontWeight: WEIGHT.semibold,
-  },
-  summaryHeroHint: {
-    marginTop: 2,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.caption,
-    color: colors.lightText,
-  },
-  filterTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.secondary, marginBottom: 8 },
-  filterRow: { flexDirection: 'row', gap: 10 },
-  filterField: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 12,
-    padding: 10,
-    backgroundColor: colors.glassSoft,
-  },
-  filterLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginBottom: 4 },
-  filterValueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  filterValue: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.semibold, color: colors.text },
-  clearButton: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    backgroundColor: colors.pillBg,
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  clearButtonText: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.secondary, fontWeight: WEIGHT.semibold },
-  card: {
-    backgroundColor: colors.glass,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    padding: 14,
-    marginBottom: 12,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  cardRow: { flexDirection: 'row', alignItems: 'center' },
-  cardIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: colors.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  cardText: { flex: 1 },
-  cardTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.text },
-  cardSub: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: colors.lightText, marginTop: 2 },
-  deleteBtn: { padding: 6 },
-  recRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 6 },
-  recChip: {
-    backgroundColor: colors.pillBg,
-    borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: colors.pillBorder,
-  },
-  recChipText: { fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.secondary, fontWeight: WEIGHT.semibold },
-  timestampText: { fontFamily: FONT_FAMILY, marginTop: 8, color: colors.lightText, fontSize: TYPE.tiny },
-  listWrap: {},
-  loadMoreBtn: {
-    marginTop: 4,
-    alignSelf: 'center',
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassSoft,
-  },
-  loadMoreText: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.caption,
-    fontWeight: WEIGHT.semibold,
-    color: colors.secondary,
-  },
-  bgAccent: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: colors.iconBg,
-    right: -80,
-    top: -60,
-    opacity: 0.6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalCard: {
-    backgroundColor: colors.glass,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    maxHeight: 420,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-  },
-  modalList: {
-    maxHeight: 330,
-  },
-  modalOptions: {
-    paddingBottom: 6,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  modalTitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.h3, fontWeight: WEIGHT.bold, color: colors.secondary },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassSoft,
-    marginBottom: 10,
-  },
-  modalOptionActive: { borderColor: colors.pillBorder, backgroundColor: colors.pillBg },
-  modalLabel: { fontFamily: FONT_FAMILY, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.text },
-  modalLabelActive: { color: colors.primary },
-  modalEmpty: {
-    fontFamily: FONT_FAMILY,
-    color: colors.lightText,
-    textAlign: 'center',
-    paddingVertical: 12,
-    fontSize: TYPE.bodySmall,
-  },
-  confirmOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  confirmBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  confirmCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: colors.glass,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    padding: 16,
-  },
-  confirmTitle: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.body,
-    fontWeight: WEIGHT.bold,
-    color: colors.secondary,
-  },
-  confirmText: {
-    marginTop: 6,
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.bodySmall,
-    color: colors.lightText,
-    lineHeight: 20,
-  },
-  confirmActions: {
-    marginTop: 14,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  confirmButton: {
-    flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassSoft,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmDeleteButton: {
-    backgroundColor: colors.error,
-    borderColor: colors.error,
-  },
-  confirmButtonText: {
-    fontFamily: FONT_FAMILY,
-    fontSize: TYPE.caption,
-    fontWeight: WEIGHT.semibold,
-    color: colors.secondary,
-  },
-  confirmDeleteText: {
-    color: colors.white,
-  },
-});
+    container: { flex: 1, backgroundColor: c.background },
+    content: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
+    header: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.lg },
+    headerIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.iconBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: SPACING.md,
+    },
+    headerText: { flex: 1 },
+    title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: c.primary },
+    subtitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+      marginTop: 2,
+      lineHeight: 18,
+    },
+    filterCard: { marginBottom: SPACING.md },
+    filterTitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+      color: c.lightText,
+      marginBottom: SPACING.sm,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+    },
+    filterRow: { flexDirection: 'row', gap: SPACING.sm + 2 },
+    filterField: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      borderRadius: RADIUS.md,
+      padding: SPACING.md - 2,
+      backgroundColor: c.glassSoft,
+    },
+    filterLabel: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.lightText,
+      marginBottom: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    filterValueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    filterValue: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.semibold,
+      color: c.text,
+    },
+    clearBtn: { alignSelf: 'flex-start', marginTop: SPACING.sm, paddingHorizontal: 0 },
+    summaryWrap: { marginBottom: SPACING.md, gap: SPACING.sm },
+    summaryHeroCard: {
+      backgroundColor: c.pillBg,
+      borderRadius: RADIUS.md + 2,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      paddingVertical: SPACING.md - 2,
+      paddingHorizontal: SPACING.md - 1,
+    },
+    summaryHeroTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    summaryHeroLabel: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.secondary,
+      fontWeight: WEIGHT.semibold,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+    },
+    summaryHeroValue: {
+      marginTop: 8,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.h2,
+      color: c.primary,
+      fontWeight: WEIGHT.bold,
+    },
+    summaryHeroSub: {
+      fontSize: TYPE.bodySmall,
+      color: c.secondary,
+      fontWeight: WEIGHT.semibold,
+    },
+    summaryHeroHint: {
+      marginTop: 2,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+    },
+    skel: { gap: SPACING.md },
+    card: {
+      backgroundColor: c.glass,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      padding: SPACING.md + 2,
+      marginBottom: SPACING.md,
+      ...elevation(c.shadow, 'sm'),
+    },
+    cardRow: { flexDirection: 'row', alignItems: 'center' },
+    cardIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: RADIUS.md - 2,
+      backgroundColor: c.iconBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: SPACING.sm + 2,
+    },
+    cardText: { flex: 1 },
+    cardTitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.semibold,
+      color: c.text,
+    },
+    cardSub: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+      marginTop: 3,
+    },
+    recRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: SPACING.sm + 2, gap: 6 },
+    timestampText: {
+      fontFamily: FONT_FAMILY,
+      marginTop: SPACING.sm,
+      color: c.lightText,
+      fontSize: TYPE.tiny,
+    },
+    listWrap: {},
+    loadMoreBtn: { marginTop: 4, alignSelf: 'center' },
+    bgAccent: {
+      position: 'absolute',
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: c.iconBg,
+      right: -80,
+      top: -60,
+      opacity: 0.5,
+    },
+  });
 
 export default HistoryScreen;

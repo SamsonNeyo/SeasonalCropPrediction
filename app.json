@@ -25,7 +25,8 @@
       ],
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.neyo1.croppredictionapp"
+      "package": "com.neyo1.croppredictionapp",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,6 +36,13 @@
         "projectId": "444a4f59-6c72-4f82-b0cf-007c3bed0fe4"
       }
     },
-    "owner": "neyo1"
+    "owner": "neyo1",
+    "plugins": [
+      "expo-web-browser",
+      "expo-font",
+      [
+        "@react-native-google-signin/google-signin"
+      ]
+    ]
   }
 }

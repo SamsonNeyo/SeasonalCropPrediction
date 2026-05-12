@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "127015908000",
+    "project_id": "cropprediction-luwero",
+    "storage_bucket": "cropprediction-luwero.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127015908000:android:bc86071a210d7e4ad74fc5",
+        "android_client_info": {
+          "package_name": "com.neyo1.croppredictionapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "127015908000-q70i343l01ct25dgraee1c7gftcdd5c6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.neyo1.croppredictionapp",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "127015908000-l7rhr1p0iiuh8vn2o8cq3ir8pshvabas.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDY6NYULGVPzCmzoLRtCBVk9PasJsnQGvg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "127015908000-dipqjqs8as9g228oka3n5r7cd4psn8nr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

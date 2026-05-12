@@ -7,69 +7,78 @@ import {
   StyleSheet,
   Image,
   Pressable,
-  ActivityIndicator,
   Platform,
   Animated,
   Easing,
   ScrollView,
+  KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
+import { RADIUS, SPACING } from '../constants/spacing';
 import { useAuth } from '../context/AuthContext';
+
+type StrengthInfo = { bars: number; label: string; color: string };
+
+const getStrength = (pwd: string): StrengthInfo | null => {
+  if (!pwd) return null;
+  if (pwd.length < 6) return { bars: 1, label: 'Weak — please add more strength!', color: '#EF4444' };
+  if (pwd.length < 8)  return { bars: 2, label: 'Fair — try adding numbers or symbols', color: '#F97316' };
+  if (pwd.length < 10) return { bars: 3, label: 'Good — almost there!', color: '#EAB308' };
+  return { bars: 4, label: 'Strong password', color: '#22C55E' };
+};
 
 const SignupScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { signup } = useAuth();
+  const { signup, loginWithGoogle, googleAuthSupported } = useAuth();
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
-  const headerIn = useRef(new Animated.Value(0)).current;
-  const cardIn = useRef(new Animated.Value(0)).current;
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
-    Animated.stagger(140, [
-      Animated.timing(headerIn, {
-        toValue: 1,
-        duration: 600,
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1, duration: 480,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.timing(cardIn, {
-        toValue: 1,
-        duration: 600,
+      Animated.timing(slideAnim, {
+        toValue: 0, duration: 480,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
-  }, [headerIn, cardIn]);
+  }, [fadeAnim, slideAnim]);
+
+  const strength = getStrength(password);
+  const passwordMismatch = !!confirmPassword && confirmPassword !== password;
+  const disableSubmit = !name.trim() || !email.trim() || !password || !confirmPassword || !acceptTerms;
 
   const handleSignup = async () => {
+    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+      setError('All fields are required.'); return;
+    }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (!acceptTerms) { setError('Please accept the terms to continue.'); return; }
     try {
       setError('');
-      if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-        setError('All fields are required.');
-        return;
-      }
-      if (password.length < 6) {
-        setError('Password must be at least 6 characters.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('Passwords do not match.');
-        return;
-      }
-      if (!acceptTerms) {
-        setError('Please accept the terms to continue.');
-        return;
-      }
       setLoading(true);
       await signup(email.trim(), password, name.trim() || 'Farmer');
     } catch (e: any) {
@@ -79,287 +88,422 @@ const SignupScreen = ({ navigation }: any) => {
     }
   };
 
-  const disableSignup =
-    loading || !name.trim() || !email.trim() || !password || !confirmPassword || !acceptTerms;
+  const handleGoogleSignup = async () => {
+    try {
+      setError('');
+      setGoogleLoading(true);
+      await loginWithGoogle();
+    } catch (e: any) {
+      const msg = e?.message || 'Google sign-in failed.';
+      if (!/cancel/i.test(msg)) setError(msg);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.bgOrbOne} />
-      <View style={styles.bgOrbTwo} />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Animated.View
-          style={[
-            styles.panel,
-            {
-              opacity: cardIn,
-              transform: [
-                {
-                  translateY: cardIn.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [18, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
+    <SafeAreaView style={styles.root}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <View pointerEvents="none" style={styles.cornerTopLeft} />
-          <View pointerEvents="none" style={styles.cornerBottomRight} />
-          <View style={styles.panelAccent} />
           <Animated.View
-            style={[
-              styles.header,
-              {
-                opacity: headerIn,
-                transform: [
-                  {
-                    translateY: headerIn.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [14, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
+            style={[styles.inner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
           >
-            <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
-            <Text style={styles.eyebrow}>SmartCrop</Text>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Set up your account to get started.</Text>
-          </Animated.View>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Full name"
-            placeholderTextColor={colors.lightText}
-            value={name}
-            onChangeText={setName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={colors.lightText}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <View style={styles.passwordRow}>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="Password"
-              placeholderTextColor={colors.lightText}
-              secureTextEntry={!showPassword}
-              value={password}
-              onChangeText={setPassword}
-            />
-            <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
-              <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
-            </TouchableOpacity>
-          </View>
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm password"
-            placeholderTextColor={colors.lightText}
-            secureTextEntry={!showPassword}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
-
-          <Pressable style={styles.checkboxRow} onPress={() => setAcceptTerms(!acceptTerms)} hitSlop={6}>
-            <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}>
-              {acceptTerms && <MaterialCommunityIcons name="check" size={12} color={colors.white} />}
+            {/* ── Brand ── */}
+            <View style={styles.brand}>
+              <Image source={require('../../assets/splash-icon.png')} style={styles.logo} />
+              <Text style={styles.title}>Create your account</Text>
+              <Text style={styles.subtitle}>Get personalized crop guidance for your farm</Text>
             </View>
-            <Text style={styles.checkboxText}>I agree to the Terms & Privacy Policy</Text>
-          </Pressable>
 
-          {!!error && <Text style={styles.error}>{error}</Text>}
+            {/* ── Full name ── */}
+            <View style={styles.field}>
+              <Text style={styles.label}>Full name</Text>
+              <View style={styles.inputRow}>
+                <MaterialCommunityIcons name="account-outline" size={18} color={colors.lightText} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Jane Farmer"
+                  placeholderTextColor={colors.lightText}
+                  value={name}
+                  onChangeText={setName}
+                />
+              </View>
+            </View>
 
-          <TouchableOpacity
-            style={[styles.primaryButton, disableSignup && styles.primaryButtonDisabled]}
-            onPress={handleSignup}
-            disabled={disableSignup}
-          >
-            {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Create Account</Text>}
-          </TouchableOpacity>
+            {/* ── Email ── */}
+            <View style={styles.field}>
+              <Text style={styles.label}>Email address</Text>
+              <View style={styles.inputRow}>
+                <MaterialCommunityIcons name="email-outline" size={18} color={colors.lightText} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email address"
+                  placeholderTextColor={colors.lightText}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
+            </View>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.link}>Already have an account? Sign In</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
+            {/* ── Password ── */}
+            <View style={styles.field}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.inputRow}>
+                <MaterialCommunityIcons name="lock-outline" size={18} color={colors.lightText} />
+                <TextInput
+                  style={[styles.input, styles.inputFlex]}
+                  placeholder="At least 6 characters"
+                  placeholderTextColor={colors.lightText}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password-new"
+                  textContentType="newPassword"
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <Pressable onPress={() => setShowPassword(v => !v)} hitSlop={10}>
+                  <MaterialCommunityIcons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={18}
+                    color={colors.lightText}
+                  />
+                </Pressable>
+              </View>
+
+              {/* Strength bar */}
+              {strength && (
+                <View style={styles.strengthWrap}>
+                  <View style={styles.strengthBars}>
+                    {[1, 2, 3, 4].map(i => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.strengthBar,
+                          { backgroundColor: i <= strength.bars ? strength.color : colors.border },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.strengthLabel, { color: strength.color }]}>
+                    {strength.label}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* ── Confirm password ── */}
+            <View style={styles.field}>
+              <Text style={styles.label}>Confirm your password</Text>
+              <View style={[styles.inputRow, passwordMismatch && styles.inputRowError]}>
+                <MaterialCommunityIcons name="lock-check-outline" size={18} color={colors.lightText} />
+                <TextInput
+                  style={[styles.input, styles.inputFlex]}
+                  placeholder="Re-enter your password"
+                  placeholderTextColor={colors.lightText}
+                  secureTextEntry={!showConfirm}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                />
+                <Pressable onPress={() => setShowConfirm(v => !v)} hitSlop={10}>
+                  <MaterialCommunityIcons
+                    name={showConfirm ? 'eye-outline' : 'eye-off-outline'}
+                    size={18}
+                    color={colors.lightText}
+                  />
+                </Pressable>
+              </View>
+              {passwordMismatch && (
+                <Text style={styles.fieldError}>Passwords do not match</Text>
+              )}
+            </View>
+
+            {/* ── Terms ── */}
+            <Pressable
+              style={styles.termsRow}
+              onPress={() => setAcceptTerms(v => !v)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: acceptTerms }}
+              hitSlop={6}
+            >
+              <View style={[
+                styles.checkbox,
+                acceptTerms && { backgroundColor: colors.primary, borderColor: colors.primary },
+              ]}>
+                {acceptTerms && <MaterialCommunityIcons name="check" size={12} color="#fff" />}
+              </View>
+              <Text style={styles.termsText}>
+                I agree to the <Text style={styles.termsAccent}>Terms</Text> and{' '}
+                <Text style={styles.termsAccent}>Privacy Policy</Text>
+              </Text>
+            </Pressable>
+
+            {/* ── Error ── */}
+            {!!error && (
+              <View style={styles.errorBox}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={15} color={colors.error} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {/* ── Create account ── */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.btn,
+                disableSubmit && styles.btnMuted,
+                pressed && !disableSubmit && { opacity: 0.88 },
+              ]}
+              onPress={handleSignup}
+              disabled={loading || disableSubmit}
+              accessibilityRole="button"
+              accessibilityLabel="Create account"
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.btnText}>Create Account</Text>
+              }
+            </Pressable>
+
+            {/* ── Google ── */}
+            {googleAuthSupported && (
+              <>
+                <View style={styles.divider}>
+                  <View style={styles.divLine} />
+                  <Text style={styles.divText}>Or</Text>
+                  <View style={styles.divLine} />
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.82 }]}
+                  onPress={handleGoogleSignup}
+                  disabled={googleLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with Google"
+                >
+                  {googleLoading
+                    ? <ActivityIndicator color={colors.text} size="small" />
+                    : (
+                      <>
+                        <MaterialCommunityIcons name="google" size={20} color="#EA4335" />
+                        <Text style={styles.googleText}>Continue with Google</Text>
+                      </>
+                    )
+                  }
+                </Pressable>
+              </>
+            )}
+
+            {/* ── Sign in link ── */}
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.footer}>
+              <Text style={styles.footerText}>
+                Already have an account?{'  '}
+                <Text style={styles.footerAccent}>Sign in</Text>
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContent: {
+    root: { flex: 1, backgroundColor: c.background },
+    flex: { flex: 1 },
+    scroll: {
       flexGrow: 1,
-      paddingHorizontal: 24,
-      paddingVertical: 20,
       justifyContent: 'center',
-      alignItems: 'center',
+      paddingHorizontal: SPACING.xxl,
+      paddingVertical: SPACING.xxl,
     },
-    panel: {
+    inner: {
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 420 : undefined,
-      backgroundColor: colors.glass,
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      paddingHorizontal: 22,
-      paddingVertical: 24,
       alignSelf: 'center',
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.12,
-      shadowRadius: 22,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 4,
     },
-    panelAccent: {
-      width: 48,
-      height: 4,
-      borderRadius: 999,
-      backgroundColor: colors.accent,
-      alignSelf: 'center',
-      marginBottom: 18,
-      opacity: 0.9,
-    },
-    cornerTopLeft: {
-      position: 'absolute',
-      top: 18,
-      left: 18,
-      width: 26,
-      height: 26,
-      borderTopWidth: 2,
-      borderLeftWidth: 2,
-      borderColor: colors.primary,
-      borderTopLeftRadius: 14,
-      opacity: 0.9,
-    },
-    cornerBottomRight: {
-      position: 'absolute',
-      right: 18,
-      bottom: 18,
-      width: 26,
-      height: 26,
-      borderBottomWidth: 2,
-      borderRightWidth: 2,
-      borderColor: colors.primary,
-      borderBottomRightRadius: 14,
-      opacity: 0.9,
-    },
-    header: {
-      alignItems: 'center',
-      marginBottom: 28,
-    },
-    logo: {
-      width: 84,
-      height: 84,
-      marginBottom: 12,
-    },
-    eyebrow: {
+
+    // Brand
+    brand: { alignItems: 'center', marginBottom: SPACING.xl + 8 },
+    logo: { width: 76, height: 76, borderRadius: 20, marginBottom: SPACING.md },
+    title: {
       fontFamily: FONT_FAMILY,
-      color: colors.secondary,
-      fontSize: TYPE.caption,
-      fontWeight: WEIGHT.semibold,
-      letterSpacing: 0.4,
-      textTransform: 'uppercase',
+      fontSize: 26,
+      fontWeight: WEIGHT.bold,
+      color: c.text,
+      textAlign: 'center',
       marginBottom: 6,
     },
-    title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: colors.primary },
-    subtitle: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, color: colors.lightText, marginTop: 6, textAlign: 'center' },
-    input: {
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 11,
-      marginBottom: 11,
-      backgroundColor: colors.glassSoft,
-      color: colors.text,
+    subtitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+      textAlign: 'center',
+    },
+
+    // Fields
+    field: { marginBottom: SPACING.md },
+    label: {
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.body,
-    },
-    passwordRow: {
-      position: 'relative',
-    },
-    passwordInput: {
-      paddingRight: 64,
-    },
-    passwordToggle: {
-      position: 'absolute',
-      right: 12,
-      top: 13,
-      padding: 4,
-    },
-    passwordToggleText: {
-      fontFamily: FONT_FAMILY,
-      color: colors.secondary,
       fontWeight: WEIGHT.semibold,
-      fontSize: TYPE.caption,
+      color: c.text,
+      marginBottom: 8,
     },
-    checkboxRow: {
+    inputRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 12,
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      paddingHorizontal: SPACING.md,
+      height: 54,
+      gap: SPACING.sm,
+    },
+    inputRowError: {
+      borderWidth: 1.5,
+      borderColor: c.error,
+    },
+    input: {
+      flex: 1,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      color: c.text,
+      height: '100%',
+      ...(Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } as any : {}),
+    },
+    inputFlex: { flex: 1 },
+
+    // Strength
+    strengthWrap: { marginTop: 8 },
+    strengthBars: { flexDirection: 'row', gap: 4, marginBottom: 4 },
+    strengthBar: { flex: 1, height: 3, borderRadius: 2 },
+    strengthLabel: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+    },
+    fieldError: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.error,
+      marginTop: 4,
+    },
+
+    // Terms
+    termsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      marginBottom: SPACING.md,
     },
     checkbox: {
       width: 20,
       height: 20,
       borderRadius: 6,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      marginRight: 8,
-      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      backgroundColor: c.background,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    checkboxChecked: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    checkboxText: {
+    termsText: {
+      flex: 1,
       fontFamily: FONT_FAMILY,
-      color: colors.text,
       fontSize: TYPE.bodySmall,
+      color: c.lightText,
     },
-    error: { fontFamily: FONT_FAMILY, color: colors.error, marginBottom: 10, fontSize: TYPE.bodySmall },
-    primaryButton: {
-      backgroundColor: colors.primary,
-      paddingVertical: 13,
-      borderRadius: 12,
+    termsAccent: { color: c.primary, fontWeight: WEIGHT.semibold },
+
+    // Error
+    errorBox: {
+      flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 6,
+      gap: SPACING.sm,
+      paddingVertical: 10,
+      paddingHorizontal: SPACING.md,
+      borderRadius: RADIUS.md,
+      backgroundColor: `${c.error}12`,
+      borderWidth: 1,
+      borderColor: `${c.error}30`,
+      marginBottom: SPACING.md,
     },
-    primaryButtonDisabled: { backgroundColor: '#9DBA9D' },
-    primaryButtonText: { fontFamily: FONT_FAMILY, color: colors.white, fontWeight: WEIGHT.semibold, fontSize: TYPE.body },
-    link: { fontFamily: FONT_FAMILY, color: colors.secondary, marginTop: 14, textAlign: 'center', fontSize: TYPE.bodySmall },
-    bgOrbOne: {
-      position: 'absolute',
-      width: 240,
-      height: 240,
-      borderRadius: 120,
-      backgroundColor: colors.iconBg,
-      top: -60,
-      right: -80,
-      opacity: 0.9,
+    errorText: {
+      flex: 1,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.error,
+      fontWeight: WEIGHT.semibold,
     },
-    bgOrbTwo: {
-      position: 'absolute',
-      width: 220,
-      height: 220,
-      borderRadius: 110,
-      backgroundColor: colors.pillBg,
-      bottom: -60,
-      left: -70,
-      opacity: 0.8,
+
+    // Primary button
+    btn: {
+      height: 54,
+      backgroundColor: c.primary,
+      borderRadius: RADIUS.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
+    btnMuted: { opacity: 0.5 },
+    btnText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.bold,
+      color: '#fff',
+      letterSpacing: 0.2,
+    },
+
+    // Divider
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      marginVertical: SPACING.lg,
+    },
+    divLine: { flex: 1, height: 1, backgroundColor: c.border },
+    divText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+    },
+
+    // Google
+    googleBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+      height: 54,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      backgroundColor: c.background,
+      marginBottom: SPACING.lg,
+    },
+    googleText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.body,
+      fontWeight: WEIGHT.semibold,
+      color: c.text,
+    },
+
+    // Footer
+    footer: { alignItems: 'center', paddingVertical: SPACING.sm },
+    footerText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      color: c.lightText,
+    },
+    footerAccent: { color: c.primary, fontWeight: WEIGHT.bold },
   });
 
 export default SignupScreen;
