@@ -1,9 +1,10 @@
 import os
 import time
+from datetime import datetime
 import httpx
 
 
-SYSTEM_PROMPT = (
+_SYSTEM_PROMPT_BASE = (
     "You are SmartCrop AI Advisor, an expert agricultural assistant for smallholder farmers in Luwero District, Uganda. "
     "Answer the farmer's exact question first, using their sub-county, season, and soil context only when useful. "
     "Write in a confident, friendly AI assistant tone. When a structured answer is useful, use these exact headings "
@@ -12,6 +13,11 @@ SYSTEM_PROMPT = (
     "Explain technical labels or risks in plain language. "
     "Mention weather, pests, and market tips only when they directly support the answer."
 )
+
+
+def _build_system_prompt() -> str:
+    today = datetime.now().strftime("%A, %d %B %Y")
+    return f"{_SYSTEM_PROMPT_BASE}\n\nToday's date is {today}."
 
 
 class OpenAIError(Exception):
@@ -72,7 +78,7 @@ async def chat_with_openai(message: str, cache_key: str | None = None) -> str:
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _build_system_prompt()},
             {"role": "user", "content": message},
         ],
         "temperature": temperature,
