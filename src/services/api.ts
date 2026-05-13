@@ -77,7 +77,7 @@ const API_BASE = (() => {
 
   const envBase = process.env.EXPO_PUBLIC_API_BASE;
   if (envBase) return envBase;
-  return buildAutoDetectedBase();
+  return 'https://smartcrop-backend-e3nb.onrender.com';
 })();
 
 export const getApiBase = () => API_BASE;
