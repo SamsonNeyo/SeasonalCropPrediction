@@ -134,18 +134,9 @@ const AppNavigator = () => {
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     try {
-      // If we just returned from a Google sign-in redirect, the stored nav state
-      // points to the Login screen and would conflict with the now-authenticated
-      // route stack. Clear it so we start fresh on the correct screen.
-      const googlePending = localStorage.getItem('sc-google-auth-pending');
-      if (googlePending) {
-        localStorage.removeItem('sc-google-auth-pending');
-        localStorage.removeItem(PERSISTENCE_KEY);
-      } else {
-        const stored = localStorage.getItem(PERSISTENCE_KEY);
-        if (stored) {
-          setInitialState(JSON.parse(stored));
-        }
+      const stored = localStorage.getItem(PERSISTENCE_KEY);
+      if (stored) {
+        setInitialState(JSON.parse(stored));
       }
     } catch {
       // Ignore persistence errors.

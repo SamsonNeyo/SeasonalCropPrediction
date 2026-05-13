@@ -44,7 +44,7 @@ const getStrength = (pwd: string): StrengthInfo | null => {
 const SignupScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { signup, loginWithGoogle, googleAuthSupported } = useAuth();
+  const { signup } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -54,7 +54,6 @@ const SignupScreen = ({ navigation }: any) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -94,19 +93,6 @@ const SignupScreen = ({ navigation }: any) => {
       setError(e?.message || 'Signup failed');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleSignup = async () => {
-    try {
-      setError('');
-      setGoogleLoading(true);
-      await loginWithGoogle();
-    } catch (e: any) {
-      const msg = e?.message || 'Google sign-in failed.';
-      if (!/cancel/i.test(msg)) setError(msg);
-    } finally {
-      setGoogleLoading(false);
     }
   };
 
@@ -302,35 +288,6 @@ const SignupScreen = ({ navigation }: any) => {
               }
             </Pressable>
 
-            {/* ── Google ── */}
-            {googleAuthSupported && Platform.OS === 'web' && (
-              <>
-                <View style={styles.divider}>
-                  <View style={styles.divLine} />
-                  <Text style={styles.divText}>Or</Text>
-                  <View style={styles.divLine} />
-                </View>
-
-                <Pressable
-                  style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.82 }]}
-                  onPress={handleGoogleSignup}
-                  disabled={googleLoading}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue with Google"
-                >
-                  {googleLoading
-                    ? <ActivityIndicator color={colors.text} size="small" />
-                    : (
-                      <>
-                        <MaterialCommunityIcons name="google" size={20} color="#EA4335" />
-                        <Text style={styles.googleText}>Continue with Google</Text>
-                      </>
-                    )
-                  }
-                </Pressable>
-              </>
-            )}
-
             {/* ── Sign in link ── */}
             <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.footer}>
               <Text style={styles.footerText}>
@@ -504,40 +461,6 @@ const createStyles = (c: ThemeColors) =>
       fontWeight: WEIGHT.bold,
       color: '#fff',
       letterSpacing: 0.2,
-    },
-
-    // Divider
-    divider: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm,
-      marginVertical: SPACING.lg,
-    },
-    divLine: { flex: 1, height: 1, backgroundColor: c.border },
-    divText: {
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.bodySmall,
-      color: c.lightText,
-    },
-
-    // Google
-    googleBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: SPACING.sm,
-      height: 54,
-      borderRadius: RADIUS.pill,
-      borderWidth: 1.5,
-      borderColor: c.border,
-      backgroundColor: c.background,
-      marginBottom: SPACING.lg,
-    },
-    googleText: {
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.body,
-      fontWeight: WEIGHT.semibold,
-      color: c.text,
     },
 
     // Footer
