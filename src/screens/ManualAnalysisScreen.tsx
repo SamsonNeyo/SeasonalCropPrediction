@@ -275,7 +275,7 @@ const ManualAnalysisScreen = () => {
               <StatTile
                 icon="sprout-outline"
                 tone="primary"
-                value={recommendations.length}
+                value={recommendations.filter((r: any) => (Number(r.confidence) || 0) >= 50).length}
                 label="Crops"
                 hint="matched"
               />

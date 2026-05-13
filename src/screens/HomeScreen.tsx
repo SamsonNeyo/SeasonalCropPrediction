@@ -100,7 +100,7 @@ const HomeScreen = () => {
     () => riskChips.filter((c) => c.tone === 'danger' || c.tone === 'warning').length,
     [riskChips],
   );
-  const totalRecs = recommendations.length;
+  const totalRecs = recommendations.filter((r: any) => (Number(r.confidence) || 0) >= 50).length;
   const topConfidence = topRecommendation?.confidence || 0;
 
   const isRain = useMemo(() => {
