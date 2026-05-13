@@ -99,6 +99,7 @@ const ProfileSetupScreen = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.innerContent}>
         <View style={styles.header}>
           <View style={styles.headerIcon}>
             <MaterialCommunityIcons name="account-cog-outline" size={26} color={colors.primary} />
@@ -173,6 +174,7 @@ const ProfileSetupScreen = () => {
             accessibilityLabel="Continue and save profile"
           />
         </Card>
+        </View>
       </ScrollView>
 
       <SelectSheet
@@ -195,7 +197,8 @@ const ProfileSetupScreen = () => {
 const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
-    content: { flexGrow: 1, padding: SPACING.xl, justifyContent: 'center' },
+    content: { flexGrow: 1, padding: SPACING.xl },
+    innerContent: { marginVertical: 'auto' },
     header: { alignItems: 'center', marginBottom: SPACING.lg },
     headerIcon: {
       width: 60,

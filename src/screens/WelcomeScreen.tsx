@@ -237,7 +237,6 @@ const createStyles = (c: ThemeColors) =>
 
     scroll: {
       flexGrow: 1,
-      justifyContent: 'center',
       padding: SPACING.xxl,
       paddingVertical: SPACING.xl,
     },
@@ -247,6 +246,7 @@ const createStyles = (c: ThemeColors) =>
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 480 : undefined,
       alignSelf: 'center',
+      marginVertical: 'auto',
       backgroundColor: c.glass,
       borderRadius: RADIUS.xxl,
       borderWidth: 1,

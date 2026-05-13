@@ -316,12 +316,12 @@ const createStyles = (c: ThemeColors) =>
       padding: SPACING.xxl,
       paddingTop: SPACING.lg,
       paddingVertical: SPACING.xl,
-      justifyContent: 'center',
       alignItems: 'center',
     },
     panel: {
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 440 : undefined,
+      marginVertical: 'auto',
       backgroundColor: c.glass,
       borderRadius: RADIUS.xxl,
       borderWidth: 1,

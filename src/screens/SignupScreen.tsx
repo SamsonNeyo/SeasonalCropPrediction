@@ -308,7 +308,6 @@ const createStyles = (c: ThemeColors) =>
     flex: { flex: 1 },
     scroll: {
       flexGrow: 1,
-      justifyContent: 'center',
       paddingHorizontal: SPACING.xxl,
       paddingVertical: SPACING.xxl,
     },
@@ -316,6 +315,7 @@ const createStyles = (c: ThemeColors) =>
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 420 : undefined,
       alignSelf: 'center',
+      marginVertical: 'auto',
     },
 
     // Brand
