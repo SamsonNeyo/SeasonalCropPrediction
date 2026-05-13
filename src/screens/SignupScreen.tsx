@@ -303,7 +303,7 @@ const SignupScreen = ({ navigation }: any) => {
             </Pressable>
 
             {/* ── Google ── */}
-            {googleAuthSupported && (
+            {googleAuthSupported && Platform.OS === 'web' && (
               <>
                 <View style={styles.divider}>
                   <View style={styles.divLine} />
