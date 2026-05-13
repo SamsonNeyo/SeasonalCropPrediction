@@ -110,22 +110,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      // Firebase caches the ID token (1-hour TTL), so emailVerified can be
-      // stale if the user verified in another tab after their last sign-in.
-      // Force a reload when unverified so the gate clears automatically.
-      if (currentUser && !currentUser.emailVerified) {
-        try {
-          await reload(currentUser);
-        } catch {
-          // Network error — keep cached state, user can retry manually
-        }
-      }
-      const activeUser = auth.currentUser;
-      setUser(activeUser);
-      if (activeUser) {
-        const docRef = doc(db, 'users', activeUser.uid);
+      setUser(currentUser);
+      if (currentUser) {
+        const docRef = doc(db, 'users', currentUser.uid);
         const docSnap = await getDoc(docRef);
-        setUserData(docSnap.exists() ? docSnap.data() : { name: activeUser.email?.split('@')[0] || 'Farmer' });
+        setUserData(docSnap.exists() ? docSnap.data() : { name: currentUser.email?.split('@')[0] || 'Farmer' });
       } else {
         setUserData(null);
       }
