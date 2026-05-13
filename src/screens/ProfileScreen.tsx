@@ -10,6 +10,7 @@ import {
   Easing,
   Switch,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useScrollToTop } from '@react-navigation/native';
@@ -353,6 +354,11 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      >
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
@@ -519,25 +525,23 @@ const ProfileScreen = () => {
           </View>
         )}
 
-        <View style={styles.actionRow}>
+        <View style={editMode ? styles.actionCol : styles.actionRow}>
           {editMode ? (
             <>
+              <Button
+                label="Save"
+                onPress={handleSave}
+                loading={saving}
+                fullWidth
+                accessibilityLabel="Save profile"
+              />
               <Button
                 label="Cancel"
                 variant="tertiary"
                 onPress={() => setEditMode(false)}
                 disabled={saving}
                 fullWidth
-                style={styles.actionBtn}
                 accessibilityLabel="Cancel editing"
-              />
-              <Button
-                label="Save"
-                onPress={handleSave}
-                loading={saving}
-                fullWidth
-                style={styles.actionBtn}
-                accessibilityLabel="Save profile"
               />
             </>
           ) : (
@@ -563,6 +567,8 @@ const ProfileScreen = () => {
           accessibilityLabel="Sign out"
         />
       </ScrollView>
+
+      </KeyboardAvoidingView>
 
       <SelectSheet
         visible={subCountyOpen}
@@ -720,6 +726,7 @@ const settingRowStyles = (c: ThemeColors, isLast: boolean) =>
 const createStyles = (c: ThemeColors, _isDark: boolean) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
+    flex: { flex: 1 },
     content: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
     header: {
       alignItems: 'center',
@@ -893,6 +900,7 @@ const createStyles = (c: ThemeColors, _isDark: boolean) =>
       fontWeight: WEIGHT.semibold,
     },
     actionRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+    actionCol: { flexDirection: 'column', gap: SPACING.sm, marginBottom: SPACING.md },
     actionBtn: { flex: 1 },
     logoutBtn: { marginTop: 2 },
     bgAccent: {

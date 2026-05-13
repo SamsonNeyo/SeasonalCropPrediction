@@ -5,7 +5,10 @@ import Constants from 'expo-constants';
 // Expo Go does not ship the @react-native-google-signin/google-signin
 // native module, so any call into it throws at runtime. We detect Expo Go
 // up-front and short-circuit the hook with a clear error.
-const isExpoGo = Constants.appOwnership === 'expo';
+// SDK 48+: executionEnvironment === 'storeClient'; older SDKs: appOwnership === 'expo'.
+const isExpoGo =
+  (Constants as any).executionEnvironment === 'storeClient' ||
+  Constants.appOwnership === 'expo';
 
 type GoogleSigninModule = typeof import('@react-native-google-signin/google-signin');
 
