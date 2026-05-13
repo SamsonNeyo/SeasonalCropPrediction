@@ -127,7 +127,7 @@ const ManualAnalysisScreen = () => {
   );
 
   const topRec = recommendations?.[0] || null;
-  const restRecs = recommendations?.slice(1, 5) || [];
+  const restRecs = recommendations?.slice(1) || [];
   const topConfidence = topRec?.confidence || 0;
 
   return (

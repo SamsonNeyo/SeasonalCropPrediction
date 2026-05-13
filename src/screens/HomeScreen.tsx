@@ -72,7 +72,7 @@ const HomeScreen = () => {
   const seasonValue = useMemo(() => getCurrentSeason(), []);
   const todayLabel = useMemo(() => formatDate(new Date()), []);
   const topRecommendation = useMemo(() => recommendations[0] || null, [recommendations]);
-  const otherRecommendations = useMemo(() => recommendations.slice(1, 5), [recommendations]);
+  const otherRecommendations = useMemo(() => recommendations.slice(1), [recommendations]);
   const subCounty = userData?.subCounty || 'Bamunanika';
   const farmerName = userData?.name || user?.email?.split('@')[0] || 'Farmer';
   const userPhoto = userData?.photoBase64 || userData?.photoUri || null;
