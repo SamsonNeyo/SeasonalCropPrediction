@@ -70,121 +70,6 @@ const WelcomeScreen = ({ navigation }: any) => {
     ]).start();
   }, [cardAnim, contentAnim, btnAnim]);
 
-  const card = (
-    <Animated.View
-      style={[
-        styles.card,
-        {
-          opacity: cardAnim,
-          transform: [{
-            translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
-          }, {
-            scale: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }),
-          }],
-        },
-      ]}
-    >
-      {/* Top accent bar */}
-      <View style={styles.accentBar} />
-
-      {/* Corner marks */}
-      <View style={[styles.cornerTL, { pointerEvents: 'none' }]} />
-      <View style={[styles.cornerBR, { pointerEvents: 'none' }]} />
-
-      {/* ── Brand section ── */}
-      <Animated.View
-        style={[
-          styles.brand,
-          {
-            opacity: contentAnim,
-            transform: [{
-              translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
-            }],
-          },
-        ]}
-      >
-        <View style={styles.logoRing}>
-          <Image
-            source={require('../../assets/splash-icon.png')}
-            style={styles.logo}
-            resizeMode="cover"
-          />
-        </View>
-
-        <Text style={styles.appName}>SmartCrop</Text>
-        <Text style={styles.tagline}>Your seasonal crop guide</Text>
-        <Text style={styles.description}>
-          Personalized recommendations for Luwero farmers backed by weather data and soil science.
-        </Text>
-      </Animated.View>
-
-      {/* ── Divider ── */}
-      <Animated.View style={[styles.dividerWrap, { opacity: contentAnim }]}>
-        <View style={styles.dividerLine} />
-      </Animated.View>
-
-      {/* ── Features ── */}
-      <Animated.View
-        style={[
-          styles.features,
-          {
-            opacity: contentAnim,
-            transform: [{
-              translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }),
-            }],
-          },
-        ]}
-      >
-        {FEATURES.map((f) => (
-          <View key={f.title} style={styles.featureRow}>
-            <View style={styles.featureIcon}>
-              <MaterialCommunityIcons name={f.icon} size={19} color={colors.primary} />
-            </View>
-            <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureBody}>{f.body}</Text>
-            </View>
-          </View>
-        ))}
-      </Animated.View>
-
-      {/* ── Actions ── */}
-      <Animated.View
-        style={[
-          styles.actions,
-          {
-            opacity: btnAnim,
-            transform: [{
-              translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
-            }],
-          },
-        ]}
-      >
-        <Pressable
-          style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
-          onPress={() => navigation.navigate('Signup')}
-          accessibilityRole="button"
-          accessibilityLabel="Get started"
-        >
-          <Text style={styles.btnPrimaryText}>Get Started</Text>
-          <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
-          onPress={() => navigation.navigate('Login')}
-          accessibilityRole="button"
-          accessibilityLabel="Sign in"
-        >
-          <Text style={styles.btnSecondaryText}>
-            Already have an account?{'  '}
-            <Text style={styles.btnSecondaryAccent}>Sign in</Text>
-          </Text>
-        </Pressable>
-      </Animated.View>
-    </Animated.View>
-  );
-
   return (
     <SafeAreaView style={styles.root}>
       {/* Background orbs */}
@@ -192,16 +77,124 @@ const WelcomeScreen = ({ navigation }: any) => {
       <View style={[styles.orbBottomLeft, { pointerEvents: 'none' }]} />
       <View style={[styles.orbMidRight, { pointerEvents: 'none' }]} />
 
-      {Platform.OS === 'web' ? (
-        <View style={styles.webContainer}>{card}</View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Glass card ── */}
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              opacity: cardAnim,
+              transform: [{
+                translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
+              }, {
+                scale: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }),
+              }],
+            },
+          ]}
         >
-          {card}
-        </ScrollView>
-      )}
+          {/* Top accent bar */}
+          <View style={styles.accentBar} />
+
+          {/* Corner marks */}
+          <View style={[styles.cornerTL, { pointerEvents: 'none' }]} />
+          <View style={[styles.cornerBR, { pointerEvents: 'none' }]} />
+
+          {/* ── Brand section ── */}
+          <Animated.View
+            style={[
+              styles.brand,
+              {
+                opacity: contentAnim,
+                transform: [{
+                  translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+                }],
+              },
+            ]}
+          >
+            <View style={styles.logoRing}>
+              <Image
+                source={require('../../assets/splash-icon.png')}
+                style={styles.logo}
+                resizeMode="cover"
+              />
+            </View>
+
+            <Text style={styles.appName}>SmartCrop</Text>
+            <Text style={styles.tagline}>Your seasonal crop guide</Text>
+            <Text style={styles.description}>
+              Personalized recommendations for Luwero farmers backed by weather data and soil science.
+            </Text>
+          </Animated.View>
+
+          {/* ── Divider ── */}
+          <Animated.View style={[styles.dividerWrap, { opacity: contentAnim }]}>
+            <View style={styles.dividerLine} />
+          </Animated.View>
+
+          {/* ── Features ── */}
+          <Animated.View
+            style={[
+              styles.features,
+              {
+                opacity: contentAnim,
+                transform: [{
+                  translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }),
+                }],
+              },
+            ]}
+          >
+            {FEATURES.map((f) => (
+              <View key={f.title} style={styles.featureRow}>
+                <View style={styles.featureIcon}>
+                  <MaterialCommunityIcons name={f.icon} size={19} color={colors.primary} />
+                </View>
+                <View style={styles.featureText}>
+                  <Text style={styles.featureTitle}>{f.title}</Text>
+                  <Text style={styles.featureBody}>{f.body}</Text>
+                </View>
+              </View>
+            ))}
+          </Animated.View>
+
+          {/* ── Actions ── */}
+          <Animated.View
+            style={[
+              styles.actions,
+              {
+                opacity: btnAnim,
+                transform: [{
+                  translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
+                }],
+              },
+            ]}
+          >
+            <Pressable
+              style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
+              onPress={() => navigation.navigate('Signup')}
+              accessibilityRole="button"
+              accessibilityLabel="Get started"
+            >
+              <Text style={styles.btnPrimaryText}>Get Started</Text>
+              <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
+              onPress={() => navigation.navigate('Login')}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+            >
+              <Text style={styles.btnSecondaryText}>
+                Already have an account?{'  '}
+                <Text style={styles.btnSecondaryAccent}>Sign in</Text>
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -242,18 +235,8 @@ const createStyles = (c: ThemeColors) =>
       opacity: 0.5,
     },
 
-    // Web: plain centered View — no scroll container so no bounce/scroll on mobile browsers
-    webContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      padding: SPACING.xxl,
-      paddingVertical: SPACING.xl,
-    },
-
-    // Native: ScrollView content container (card is taller than some small screens)
     scroll: {
       flexGrow: 1,
-      justifyContent: 'center',
       padding: SPACING.xxl,
       paddingVertical: SPACING.xl,
     },
@@ -263,6 +246,7 @@ const createStyles = (c: ThemeColors) =>
       width: '100%',
       maxWidth: Platform.OS === 'web' ? 480 : undefined,
       alignSelf: 'center',
+      marginVertical: 'auto',
       backgroundColor: c.glass,
       borderRadius: RADIUS.xxl,
       borderWidth: 1,
