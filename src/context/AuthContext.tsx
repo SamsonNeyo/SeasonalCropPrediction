@@ -5,7 +5,6 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  sendEmailVerification,
   reload,
   User,
 } from 'firebase/auth';
@@ -23,7 +22,6 @@ type AuthContextType = {
   resetPassword: (email: string) => Promise<void>;
   updateUserData: (data: Record<string, any>) => Promise<void>;
   refreshUser: () => Promise<User | null>;
-  sendVerificationEmail: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -96,7 +94,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const normalizedEmail = email.trim().toLowerCase();
       const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-      await sendEmailVerification(cred.user);
       await setDoc(doc(db, 'users', cred.user.uid), {
         name,
         region: 'Luwero',
@@ -142,11 +139,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(auth.currentUser);
     return auth.currentUser;
   };
-  const sendVerificationEmail = async () => {
-    if (!auth.currentUser) return;
-    await sendEmailVerification(auth.currentUser);
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -159,7 +151,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         resetPassword,
         updateUserData,
         refreshUser,
-        sendVerificationEmail,
       }}
     >
       {children}
