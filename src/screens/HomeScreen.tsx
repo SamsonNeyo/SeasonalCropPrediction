@@ -8,7 +8,6 @@ import {
   Easing,
   RefreshControl,
   Image,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -50,6 +49,15 @@ const formatDate = (d: Date) =>
 
 const HOME_CACHE_TTL_MS = 1000 * 60 * 30;
 
+const PRED_STEPS = [
+  { label: 'Connecting to server…',        short: 'Connect',  toProgress: 0.15 },
+  { label: 'Reading soil & weather data…', short: 'Soil data', toProgress: 0.42 },
+  { label: 'Analysing seasonal patterns…', short: 'Season',   toProgress: 0.65 },
+  { label: 'Ranking crop options…',        short: 'Ranking',  toProgress: 0.85 },
+  { label: 'Finalising recommendations…',  short: 'Done',     toProgress: 0.97 },
+];
+const STEP_DELAYS_MS = [8000, 10000, 12000, 15000];
+
 type RiskChip = { label: string; tone: ChipTone; icon: keyof typeof MaterialCommunityIcons.glyphMap };
 
 const HomeScreen = () => {
@@ -62,7 +70,6 @@ const HomeScreen = () => {
   const [weather, setWeather] = useState<any>(null);
   const [seasonAdvice, setSeasonAdvice] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Fetching recommendations…');
   const headerIn = useRef(new Animated.Value(0)).current;
   const heroIn = useRef(new Animated.Value(0)).current;
   const statsIn = useRef(new Animated.Value(0)).current;
@@ -200,16 +207,6 @@ const HomeScreen = () => {
       Animated.timing(listIn, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
   }, [fetchSeasonalRecommendations, loadCachedHome, headerIn, heroIn, statsIn, listIn]);
-
-  useEffect(() => {
-    if (!loading || recommendations.length > 0) {
-      setLoadingMessage('Fetching recommendations…');
-      return;
-    }
-    const t1 = setTimeout(() => setLoadingMessage('Server is starting up, please wait…'), 10000);
-    const t2 = setTimeout(() => setLoadingMessage('Almost ready, hang tight…'), 30000);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [loading, recommendations.length]);
 
   const handleRefresh = async () => {
     try {
@@ -429,24 +426,15 @@ const HomeScreen = () => {
           </View>
 
           {loading ? (
-            <>
-              {recommendations.length === 0 && (
-                <View style={styles.loadingBanner}>
-                  <ActivityIndicator size="small" color={colors.primary} style={styles.loadingSpinner} />
-                  <View style={styles.loadingBannerText}>
-                    <Text style={styles.loadingBannerTitle}>{loadingMessage}</Text>
-                    <Text style={styles.loadingBannerHint}>
-                      First load wakes the server — subsequent loads are instant.
-                    </Text>
-                  </View>
-                </View>
-              )}
+            recommendations.length === 0 ? (
+              <PredictionLoader />
+            ) : (
               <SkeletonGroup style={styles.skelGroup}>
                 <Skeleton height={300} borderRadius={RADIUS.xl} />
                 <Skeleton height={210} borderRadius={RADIUS.lg} />
                 <Skeleton height={210} borderRadius={RADIUS.lg} />
               </SkeletonGroup>
-            </>
+            )
           ) : error ? (
             <EmptyState
               icon="cloud-off-outline"
@@ -595,6 +583,136 @@ const SeasonBlock = ({
       >
         {value}
       </Text>
+    </View>
+  );
+};
+
+const PredictionLoader = () => {
+  const { colors, isDark } = useTheme();
+  const [stepIdx, setStepIdx] = useState(0);
+  const progress = useRef(new Animated.Value(0.05)).current;
+
+  useEffect(() => {
+    let cum = 0;
+    const timers = STEP_DELAYS_MS.map((delay, i) => {
+      cum += delay;
+      return setTimeout(() => setStepIdx(i + 1), cum);
+    });
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: PRED_STEPS[stepIdx].toProgress,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [stepIdx, progress]);
+
+  const trackBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+
+  return (
+    <View style={{
+      backgroundColor: colors.glass,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: RADIUS.xl,
+      padding: SPACING.lg,
+      gap: SPACING.lg,
+    }}>
+      {/* Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
+        <View style={{
+          width: 46,
+          height: 46,
+          borderRadius: RADIUS.md,
+          backgroundColor: colors.iconBg,
+          borderWidth: 1,
+          borderColor: colors.pillBorder,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <MaterialCommunityIcons name="sprout" size={23} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: TYPE.body,
+            fontWeight: WEIGHT.bold,
+            color: colors.text,
+          }}>
+            Predicting your crops
+          </Text>
+          <Text style={{
+            marginTop: 3,
+            fontFamily: FONT_FAMILY,
+            fontSize: TYPE.caption,
+            color: colors.lightText,
+            lineHeight: 17,
+          }}>
+            {PRED_STEPS[stepIdx].label}
+          </Text>
+        </View>
+      </View>
+
+      {/* Progress bar */}
+      <View>
+        <View style={{
+          height: 7,
+          borderRadius: RADIUS.pill,
+          backgroundColor: trackBg,
+          overflow: 'hidden',
+        }}>
+          <Animated.View style={{
+            height: '100%',
+            borderRadius: RADIUS.pill,
+            backgroundColor: colors.primary,
+            width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+          }} />
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+          <Text style={{ fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.lightText }}>
+            Analysing Luwero data
+          </Text>
+          <Text style={{ fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.primary, fontWeight: WEIGHT.bold }}>
+            {Math.round(PRED_STEPS[stepIdx].toProgress * 100)}%
+          </Text>
+        </View>
+      </View>
+
+      {/* Step dots */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        {PRED_STEPS.map((s, i) => (
+          <View key={i} style={{ alignItems: 'center', gap: 6, flex: 1 }}>
+            <View style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              borderWidth: 2,
+              borderColor: i <= stepIdx ? colors.primary : colors.glassBorder,
+              backgroundColor: i < stepIdx ? colors.primary : 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {i < stepIdx ? (
+                <MaterialCommunityIcons name="check" size={11} color="#fff" />
+              ) : i === stepIdx ? (
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
+              ) : null}
+            </View>
+            <Text style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 9,
+              textAlign: 'center',
+              color: i === stepIdx ? colors.primary : i < stepIdx ? colors.secondary : colors.lightText,
+              fontWeight: i === stepIdx ? WEIGHT.bold : WEIGHT.semibold,
+            }} numberOfLines={1}>
+              {s.short}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 };
@@ -907,33 +1025,6 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       textTransform: 'uppercase',
     },
     skelGroup: { gap: SPACING.md },
-    loadingBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.md,
-      backgroundColor: c.glass,
-      borderWidth: 1,
-      borderColor: c.glassBorder,
-      borderRadius: RADIUS.lg,
-      paddingVertical: SPACING.md,
-      paddingHorizontal: SPACING.md + 2,
-      marginBottom: SPACING.md,
-    },
-    loadingSpinner: { flexShrink: 0 },
-    loadingBannerText: { flex: 1 },
-    loadingBannerTitle: {
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.bodySmall,
-      fontWeight: WEIGHT.semibold,
-      color: c.text,
-    },
-    loadingBannerHint: {
-      marginTop: 3,
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.caption,
-      color: c.lightText,
-      lineHeight: 17,
-    },
 
     // ── Background accents ──
     bgAccent: {
