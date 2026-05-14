@@ -30,6 +30,7 @@ const ProfileSetupScreen = () => {
   const [soilType, setSoilType] = useState('');
   const [open, setOpen] = useState(false);
   const [loadingZones, setLoadingZones] = useState(true);
+  const [loadingHint, setLoadingHint] = useState('Loading sub-counties…');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,7 +38,9 @@ const ProfileSetupScreen = () => {
     const loadZones = async () => {
       try {
         setLoadingZones(true);
+        const t = setTimeout(() => setLoadingHint('Server is starting up, please wait…'), 10000);
         const payload = await getSoilZones();
+        clearTimeout(t);
         const list = payload?.soil_zones || [];
         setZones(list);
       } catch {
@@ -124,6 +127,7 @@ const ProfileSetupScreen = () => {
           {loadingZones ? (
             <SkeletonGroup style={styles.skelGroup}>
               <Skeleton height={48} borderRadius={RADIUS.md} />
+              <Text style={styles.loadingHintText}>{loadingHint}</Text>
             </SkeletonGroup>
           ) : (
             <TouchableOpacity
@@ -238,6 +242,13 @@ const createStyles = (c: ThemeColors) =>
       letterSpacing: 0.2,
     },
     skelGroup: { marginBottom: SPACING.md },
+    loadingHintText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+      marginTop: SPACING.sm,
+      textAlign: 'center',
+    },
     selectField: {
       borderWidth: 1,
       borderColor: c.glassBorder,

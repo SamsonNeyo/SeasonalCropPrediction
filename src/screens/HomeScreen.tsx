@@ -8,6 +8,7 @@ import {
   Easing,
   RefreshControl,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -61,6 +62,7 @@ const HomeScreen = () => {
   const [weather, setWeather] = useState<any>(null);
   const [seasonAdvice, setSeasonAdvice] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Fetching recommendations…');
   const headerIn = useRef(new Animated.Value(0)).current;
   const heroIn = useRef(new Animated.Value(0)).current;
   const statsIn = useRef(new Animated.Value(0)).current;
@@ -198,6 +200,16 @@ const HomeScreen = () => {
       Animated.timing(listIn, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
   }, [fetchSeasonalRecommendations, loadCachedHome, headerIn, heroIn, statsIn, listIn]);
+
+  useEffect(() => {
+    if (!loading || recommendations.length > 0) {
+      setLoadingMessage('Fetching recommendations…');
+      return;
+    }
+    const t1 = setTimeout(() => setLoadingMessage('Server is starting up, please wait…'), 10000);
+    const t2 = setTimeout(() => setLoadingMessage('Almost ready, hang tight…'), 30000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [loading, recommendations.length]);
 
   const handleRefresh = async () => {
     try {
@@ -417,11 +429,24 @@ const HomeScreen = () => {
           </View>
 
           {loading ? (
-            <SkeletonGroup style={styles.skelGroup}>
-              <Skeleton height={300} borderRadius={RADIUS.xl} />
-              <Skeleton height={210} borderRadius={RADIUS.lg} />
-              <Skeleton height={210} borderRadius={RADIUS.lg} />
-            </SkeletonGroup>
+            <>
+              {recommendations.length === 0 && (
+                <View style={styles.loadingBanner}>
+                  <ActivityIndicator size="small" color={colors.primary} style={styles.loadingSpinner} />
+                  <View style={styles.loadingBannerText}>
+                    <Text style={styles.loadingBannerTitle}>{loadingMessage}</Text>
+                    <Text style={styles.loadingBannerHint}>
+                      First load wakes the server — subsequent loads are instant.
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <SkeletonGroup style={styles.skelGroup}>
+                <Skeleton height={300} borderRadius={RADIUS.xl} />
+                <Skeleton height={210} borderRadius={RADIUS.lg} />
+                <Skeleton height={210} borderRadius={RADIUS.lg} />
+              </SkeletonGroup>
+            </>
           ) : error ? (
             <EmptyState
               icon="cloud-off-outline"
@@ -882,6 +907,33 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       textTransform: 'uppercase',
     },
     skelGroup: { gap: SPACING.md },
+    loadingBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      backgroundColor: c.glass,
+      borderWidth: 1,
+      borderColor: c.glassBorder,
+      borderRadius: RADIUS.lg,
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.md + 2,
+      marginBottom: SPACING.md,
+    },
+    loadingSpinner: { flexShrink: 0 },
+    loadingBannerText: { flex: 1 },
+    loadingBannerTitle: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.bodySmall,
+      fontWeight: WEIGHT.semibold,
+      color: c.text,
+    },
+    loadingBannerHint: {
+      marginTop: 3,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+      lineHeight: 17,
+    },
 
     // ── Background accents ──
     bgAccent: {

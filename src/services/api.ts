@@ -118,3 +118,9 @@ export const predictBySubCounty = async (data: { sub_county: string; season?: st
   writeCache(cacheKey, res.data);
   return res.data;
 };
+
+// Fire-and-forget: wake Render free-tier from cold sleep and pre-cache soil zones
+// so ProfileSetup and ManualAnalysis feel instant when the user reaches them.
+export const warmupBackend = () => {
+  getSoilZones().catch(() => {});
+};

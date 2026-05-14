@@ -11,6 +11,14 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { FirebaseError } from 'firebase/app';
 import { auth, db } from '../config/firebase';
+import { warmupBackend, predictBySubCounty, getSoilZones } from '../services/api';
+
+const getCurrentSeason = () => {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 6) return 'First';
+  if (month >= 8 && month <= 12) return 'Second';
+  return 'First';
+};
 
 type AuthContextType = {
   user: User | null;
@@ -68,12 +76,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    warmupBackend();
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         const docRef = doc(db, 'users', currentUser.uid);
         const docSnap = await getDoc(docRef);
-        setUserData(docSnap.exists() ? docSnap.data() : { name: currentUser.email?.split('@')[0] || 'Farmer' });
+        const data = docSnap.exists()
+          ? docSnap.data()
+          : { name: currentUser.email?.split('@')[0] || 'Farmer' };
+        setUserData(data);
+        // Pre-fetch in background so HomeScreen and ProfileSetup load instantly
+        if (data?.profileComplete && data?.subCounty) {
+          predictBySubCounty({ sub_county: data.subCounty, season: getCurrentSeason() }).catch(() => {});
+        }
+        getSoilZones().catch(() => {});
       } else {
         setUserData(null);
       }
