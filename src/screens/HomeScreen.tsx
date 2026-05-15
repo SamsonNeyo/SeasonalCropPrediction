@@ -8,6 +8,7 @@ import {
   Easing,
   RefreshControl,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -49,14 +50,12 @@ const formatDate = (d: Date) =>
 
 const HOME_CACHE_TTL_MS = 1000 * 60 * 30;
 
-const PRED_STEPS = [
-  { label: 'Connecting to server…',        short: 'Connect',  toProgress: 0.15 },
-  { label: 'Reading soil & weather data…', short: 'Soil data', toProgress: 0.42 },
-  { label: 'Analysing seasonal patterns…', short: 'Season',   toProgress: 0.65 },
-  { label: 'Ranking crop options…',        short: 'Ranking',  toProgress: 0.85 },
-  { label: 'Finalising recommendations…',  short: 'Done',     toProgress: 0.97 },
+const PRED_MESSAGES = [
+  'Analysing your farm conditions…',
+  'Finding the best crops for this season…',
+  'Preparing your personalised recommendations…',
+  'Almost ready…',
 ];
-const STEP_DELAYS_MS = [8000, 10000, 12000, 15000];
 
 type RiskChip = { label: string; tone: ChipTone; icon: keyof typeof MaterialCommunityIcons.glyphMap };
 
@@ -588,131 +587,75 @@ const SeasonBlock = ({
 };
 
 const PredictionLoader = () => {
-  const { colors, isDark } = useTheme();
-  const [stepIdx, setStepIdx] = useState(0);
-  const progress = useRef(new Animated.Value(0.05)).current;
+  const { colors } = useTheme();
+  const [msgIdx, setMsgIdx] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    let cum = 0;
-    const timers = STEP_DELAYS_MS.map((delay, i) => {
-      cum += delay;
-      return setTimeout(() => setStepIdx(i + 1), cum);
-    });
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: PRED_STEPS[stepIdx].toProgress,
-      duration: 700,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [stepIdx, progress]);
-
-  const trackBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+    const cycle = setInterval(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0, duration: 350,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setMsgIdx((i) => (i + 1) % PRED_MESSAGES.length);
+        Animated.timing(fadeAnim, {
+          toValue: 1, duration: 350,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 4000);
+    return () => clearInterval(cycle);
+  }, [fadeAnim]);
 
   return (
     <View style={{
-      backgroundColor: colors.glass,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-      borderRadius: RADIUS.xl,
-      padding: SPACING.lg,
-      gap: SPACING.lg,
+      minHeight: 360,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xl,
+      paddingHorizontal: SPACING.xxl,
     }}>
-      {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
-        <View style={{
-          width: 46,
-          height: 46,
-          borderRadius: RADIUS.md,
-          backgroundColor: colors.iconBg,
-          borderWidth: 1,
-          borderColor: colors.pillBorder,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <MaterialCommunityIcons name="sprout" size={23} color={colors.primary} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{
-            fontFamily: FONT_FAMILY,
-            fontSize: TYPE.body,
-            fontWeight: WEIGHT.bold,
-            color: colors.text,
-          }}>
-            Predicting your crops
-          </Text>
-          <Text style={{
-            marginTop: 3,
-            fontFamily: FONT_FAMILY,
-            fontSize: TYPE.caption,
-            color: colors.lightText,
-            lineHeight: 17,
-          }}>
-            {PRED_STEPS[stepIdx].label}
-          </Text>
-        </View>
+      {/* Icon */}
+      <View style={{
+        width: 80,
+        height: 80,
+        borderRadius: 24,
+        backgroundColor: colors.iconBg,
+        borderWidth: 1,
+        borderColor: colors.pillBorder,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <MaterialCommunityIcons name="sprout" size={38} color={colors.primary} />
       </View>
 
-      {/* Progress bar */}
-      <View>
-        <View style={{
-          height: 7,
-          borderRadius: RADIUS.pill,
-          backgroundColor: trackBg,
-          overflow: 'hidden',
-        }}>
-          <Animated.View style={{
-            height: '100%',
-            borderRadius: RADIUS.pill,
-            backgroundColor: colors.primary,
-            width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-          }} />
-        </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-          <Text style={{ fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.lightText }}>
-            Analysing Luwero data
-          </Text>
-          <Text style={{ fontFamily: FONT_FAMILY, fontSize: TYPE.tiny, color: colors.primary, fontWeight: WEIGHT.bold }}>
-            {Math.round(PRED_STEPS[stepIdx].toProgress * 100)}%
-          </Text>
-        </View>
-      </View>
+      {/* Spinner */}
+      <ActivityIndicator size="large" color={colors.primary} />
 
-      {/* Step dots */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        {PRED_STEPS.map((s, i) => (
-          <View key={i} style={{ alignItems: 'center', gap: 6, flex: 1 }}>
-            <View style={{
-              width: 22,
-              height: 22,
-              borderRadius: 11,
-              borderWidth: 2,
-              borderColor: i <= stepIdx ? colors.primary : colors.glassBorder,
-              backgroundColor: i < stepIdx ? colors.primary : 'transparent',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              {i < stepIdx ? (
-                <MaterialCommunityIcons name="check" size={11} color="#fff" />
-              ) : i === stepIdx ? (
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
-              ) : null}
-            </View>
-            <Text style={{
-              fontFamily: FONT_FAMILY,
-              fontSize: 9,
-              textAlign: 'center',
-              color: i === stepIdx ? colors.primary : i < stepIdx ? colors.secondary : colors.lightText,
-              fontWeight: i === stepIdx ? WEIGHT.bold : WEIGHT.semibold,
-            }} numberOfLines={1}>
-              {s.short}
-            </Text>
-          </View>
-        ))}
-      </View>
+      {/* Fading message */}
+      <Animated.View style={{ opacity: fadeAnim, alignItems: 'center', gap: SPACING.sm }}>
+        <Text style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: TYPE.body,
+          fontWeight: WEIGHT.bold,
+          color: colors.text,
+          textAlign: 'center',
+          lineHeight: 24,
+        }}>
+          {PRED_MESSAGES[msgIdx]}
+        </Text>
+        <Text style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: TYPE.caption,
+          color: colors.lightText,
+          textAlign: 'center',
+          lineHeight: 18,
+        }}>
+          Personalised for your farm in Luwero
+        </Text>
+      </Animated.View>
     </View>
   );
 };
