@@ -216,6 +216,16 @@ const HomeScreen = () => {
     }
   };
 
+  if (loading && recommendations.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.bgAccent} />
+        <View style={styles.bgAccentTwo} />
+        <PredictionLoader />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
@@ -425,15 +435,11 @@ const HomeScreen = () => {
           </View>
 
           {loading ? (
-            recommendations.length === 0 ? (
-              <PredictionLoader />
-            ) : (
-              <SkeletonGroup style={styles.skelGroup}>
-                <Skeleton height={300} borderRadius={RADIUS.xl} />
-                <Skeleton height={210} borderRadius={RADIUS.lg} />
-                <Skeleton height={210} borderRadius={RADIUS.lg} />
-              </SkeletonGroup>
-            )
+            <SkeletonGroup style={styles.skelGroup}>
+              <Skeleton height={300} borderRadius={RADIUS.xl} />
+              <Skeleton height={210} borderRadius={RADIUS.lg} />
+              <Skeleton height={210} borderRadius={RADIUS.lg} />
+            </SkeletonGroup>
           ) : error ? (
             <EmptyState
               icon="cloud-off-outline"
@@ -587,11 +593,14 @@ const SeasonBlock = ({
 };
 
 const PredictionLoader = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [msgIdx, setMsgIdx] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const ringAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Message cycle
     const cycle = setInterval(() => {
       Animated.timing(fadeAnim, {
         toValue: 0, duration: 350,
@@ -605,33 +614,77 @@ const PredictionLoader = () => {
           useNativeDriver: true,
         }).start();
       });
-    }, 4000);
+    }, 3200);
+
+    // Icon pulse
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Rotating ring
+    Animated.loop(
+      Animated.timing(ringAnim, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: true })
+    ).start();
+
     return () => clearInterval(cycle);
-  }, [fadeAnim]);
+  }, [fadeAnim, pulseAnim, ringAnim]);
+
+  const ringRotate = ringAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
     <View style={{
-      minHeight: 360,
+      flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
       gap: SPACING.xl,
       paddingHorizontal: SPACING.xxl,
+      backgroundColor: colors.background,
     }}>
-      {/* Icon */}
-      <View style={{
-        width: 80,
-        height: 80,
-        borderRadius: 24,
-        backgroundColor: colors.iconBg,
-        borderWidth: 1,
-        borderColor: colors.pillBorder,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <MaterialCommunityIcons name="sprout" size={38} color={colors.primary} />
+      {/* Pulsing icon with ring */}
+      <View style={{ alignItems: 'center', justifyContent: 'center', width: 120, height: 120 }}>
+        {/* Rotating dashed ring */}
+        <Animated.View style={{
+          position: 'absolute',
+          width: 112,
+          height: 112,
+          borderRadius: 56,
+          borderWidth: 2,
+          borderColor: colors.primary,
+          borderStyle: 'dashed',
+          opacity: 0.35,
+          transform: [{ rotate: ringRotate }],
+        }} />
+        {/* Solid outer ring */}
+        <View style={{
+          position: 'absolute',
+          width: 96,
+          height: 96,
+          borderRadius: 48,
+          borderWidth: 1,
+          borderColor: colors.pillBorder,
+          backgroundColor: colors.iconBg,
+        }} />
+        {/* Icon */}
+        <Animated.View style={{
+          width: 72,
+          height: 72,
+          borderRadius: 22,
+          backgroundColor: isDark ? colors.surface : '#fff',
+          borderWidth: 1.5,
+          borderColor: colors.pillBorder,
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: [{ scale: pulseAnim }],
+          ...elevation(colors.shadow, 'md'),
+        }}>
+          <MaterialCommunityIcons name="sprout" size={34} color={colors.primary} />
+        </Animated.View>
       </View>
 
-      {/* Spinner */}
+      {/* Spinner dots */}
       <ActivityIndicator size="large" color={colors.primary} />
 
       {/* Fading message */}
