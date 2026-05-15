@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
@@ -6,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import AppNavigator from './navigation/AppNavigator';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
+import { Analytics } from '@vercel/analytics/react';
 
 const App = () => {
   Notifications.setNotificationHandler({
@@ -36,6 +38,7 @@ const AppWithTheme = () => {
     <>
       <AppNavigator />
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      {Platform.OS === 'web' && <Analytics />}
     </>
   );
 };
