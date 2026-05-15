@@ -135,7 +135,9 @@ type Message = {
   id: string;
   role: 'user' | 'ai';
   text: string;
+  displayText?: string;
   loading?: boolean;
+  typing?: boolean;
   error?: boolean;
   retryFor?: string;
 };
@@ -152,6 +154,13 @@ const AIAdvisorScreen = () => {
   const [inputFocused, setInputFocused] = useState(false);
   const headerIn = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
+  const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+    };
+  }, []);
 
   useScrollToTop(scrollRef);
 
@@ -197,10 +206,28 @@ const AIAdvisorScreen = () => {
 
     try {
       const reply = await getAIAdvice(q, { subCounty, soilType, season: `${season} Season` });
+      setIsLoading(false);
       setMessages(prev =>
-        prev.map(m => m.id === aiId ? { ...m, text: reply, loading: false } : m),
+        prev.map(m => m.id === aiId ? { ...m, text: reply, displayText: '', loading: false, typing: true } : m),
       );
+
+      const words = reply.split(' ');
+      let wordIdx = 0;
+      if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = setInterval(() => {
+        wordIdx += 3;
+        const done = wordIdx >= words.length;
+        const chunk = words.slice(0, Math.min(wordIdx, words.length)).join(' ');
+        setMessages(prev =>
+          prev.map(m => m.id === aiId ? { ...m, displayText: chunk, typing: !done } : m),
+        );
+        if (done) {
+          clearInterval(typingIntervalRef.current!);
+          typingIntervalRef.current = null;
+        }
+      }, 38);
     } catch (e: any) {
+      setIsLoading(false);
       setMessages(prev =>
         prev.map(m =>
           m.id === aiId
@@ -208,8 +235,6 @@ const AIAdvisorScreen = () => {
             : m,
         ),
       );
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -364,6 +389,8 @@ const AIAdvisorScreen = () => {
                       <View style={[styles.aiBadge, msg.error && styles.aiBadgeError]}>
                         {msg.loading ? (
                           <Text style={styles.aiBadgeText}>Thinking</Text>
+                        ) : msg.typing ? (
+                          <Text style={styles.aiBadgeText}>Typing</Text>
                         ) : msg.error ? (
                           <Text style={[styles.aiBadgeText, styles.aiBadgeTextError]}>Error</Text>
                         ) : (
@@ -379,6 +406,34 @@ const AIAdvisorScreen = () => {
                       <>
                         <Text style={styles.thinkingHint}>Analyzing your farm context…</Text>
                         <TypingDots colors={colors} />
+                      </>
+                    ) : msg.typing ? (
+                      <>
+                        {parseAdvisorResponse(msg.displayText || '').map((section, idx) => (
+                          <View key={`sec-${idx}`} style={[styles.section, idx > 0 && styles.sectionWithDivider]}>
+                            {!!section.heading && (
+                              <View style={styles.sectionHeaderRow}>
+                                <View style={styles.sectionIconWrap}>
+                                  <MaterialCommunityIcons name={section.icon} size={13} color={colors.primary} />
+                                </View>
+                                <Text style={styles.sectionHeading}>{section.heading}</Text>
+                              </View>
+                            )}
+                            {section.body.map((b, bIdx) =>
+                              b.type === 'li' ? (
+                                <View key={`b-${bIdx}`} style={styles.bulletRow}>
+                                  <View style={styles.bulletDot}>
+                                    <View style={styles.bulletDotInner} />
+                                  </View>
+                                  <Text style={styles.bulletText}>{b.text}</Text>
+                                </View>
+                              ) : (
+                                <Text key={`b-${bIdx}`} style={styles.paragraph}>{b.text}</Text>
+                              ),
+                            )}
+                          </View>
+                        ))}
+                        <Text style={[styles.paragraph, { color: colors.primary }]}>▋</Text>
                       </>
                     ) : msg.error ? (
                       <>
