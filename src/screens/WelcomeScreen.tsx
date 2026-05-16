@@ -4,13 +4,11 @@ import {
   Text,
   StyleSheet,
   Image,
-  ImageBackground,
   Platform,
   Animated,
   Easing,
   ScrollView,
   Pressable,
-
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,8 +16,6 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
-
-const HERO_IMAGE = require('../../assets/hero-farmer.jpg');
 
 type Feature = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -59,14 +55,14 @@ const WelcomeScreen = ({ navigation }: any) => {
   const btnAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.stagger(180, [
+    Animated.stagger(160, [
       Animated.timing(heroAnim, {
-        toValue: 1, duration: 800,
+        toValue: 1, duration: 700,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(cardAnim, {
-        toValue: 1, duration: 650,
+        toValue: 1, duration: 620,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -85,22 +81,15 @@ const WelcomeScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* ── Hero image (top only) ── */}
-        <ImageBackground
-          source={HERO_IMAGE}
-          style={styles.hero}
-          imageStyle={styles.heroImage}
-          resizeMode="cover"
-        >
-          <View style={styles.overlay} />
-
+        {/* ── Hero ── */}
+        <View style={styles.hero}>
           <Animated.View
             style={[
               styles.heroContent,
               {
                 opacity: heroAnim,
                 transform: [{
-                  translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }),
+                  translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
                 }],
               },
             ]}
@@ -121,125 +110,111 @@ const WelcomeScreen = ({ navigation }: any) => {
             {/* Trust badges */}
             <View style={styles.badgeRow}>
               <View style={styles.badge}>
-                <MaterialCommunityIcons name="map-marker-outline" size={12} color="rgba(255,255,255,0.9)" />
+                <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
                 <Text style={styles.badgeText}>Luwero District</Text>
               </View>
               <View style={styles.badge}>
-                <MaterialCommunityIcons name="shield-check-outline" size={12} color="rgba(255,255,255,0.9)" />
+                <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
                 <Text style={styles.badgeText}>Free to use</Text>
               </View>
             </View>
           </Animated.View>
-        </ImageBackground>
+        </View>
 
         {/* ── Content card ── */}
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              opacity: cardAnim,
+              transform: [{
+                translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }),
+              }],
+            },
+          ]}
+        >
+          {/* What you get label */}
+          <View style={styles.sectionLabelRow}>
+            <View style={styles.sectionDot} />
+            <Text style={styles.sectionLabel}>What you get</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          {/* Features */}
+          <View style={styles.features}>
+            {FEATURES.map((f) => (
+              <View key={f.title} style={styles.featureRow}>
+                <View style={styles.featureIcon}>
+                  <MaterialCommunityIcons name={f.icon} size={20} color={colors.primary} />
+                </View>
+                <View style={styles.featureText}>
+                  <Text style={styles.featureTitle}>{f.title}</Text>
+                  <Text style={styles.featureBody}>{f.body}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Actions */}
           <Animated.View
             style={[
-              styles.card,
+              styles.actions,
               {
-                opacity: cardAnim,
+                opacity: btnAnim,
                 transform: [{
-                  translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }),
+                  translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
                 }],
               },
             ]}
           >
-            {/* Section label */}
-            <View style={styles.sectionLabelRow}>
-              <View style={styles.sectionDot} />
-              <Text style={styles.sectionLabel}>What you get</Text>
-              <View style={styles.sectionLine} />
-            </View>
-
-            {/* Features */}
-            <View style={styles.features}>
-              {FEATURES.map((f) => (
-                <View key={f.title} style={styles.featureRow}>
-                  <View style={styles.featureIcon}>
-                    <MaterialCommunityIcons name={f.icon} size={20} color={colors.primary} />
-                  </View>
-                  <View style={styles.featureText}>
-                    <Text style={styles.featureTitle}>{f.title}</Text>
-                    <Text style={styles.featureBody}>{f.body}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            {/* Actions */}
-            <Animated.View
-              style={[
-                styles.actions,
-                {
-                  opacity: btnAnim,
-                  transform: [{
-                    translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
-                  }],
-                },
-              ]}
+            <Pressable
+              style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
+              onPress={() => navigation.navigate('Signup')}
+              accessibilityRole="button"
+              accessibilityLabel="Get started"
             >
-              <Pressable
-                style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
-                onPress={() => navigation.navigate('Signup')}
-                accessibilityRole="button"
-                accessibilityLabel="Get started"
-              >
-                <Text style={styles.btnPrimaryText}>Get Started</Text>
-                <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
-              </Pressable>
+              <Text style={styles.btnPrimaryText}>Get Started</Text>
+              <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
+            </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
-                onPress={() => navigation.navigate('Login')}
-                accessibilityRole="button"
-                accessibilityLabel="Sign in"
-              >
-                <Text style={styles.btnSecondaryText}>
-                  Already have an account?{'  '}
-                  <Text style={styles.btnSecondaryAccent}>Sign in</Text>
-                </Text>
-              </Pressable>
-            </Animated.View>
+            <Pressable
+              style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
+              onPress={() => navigation.navigate('Login')}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+            >
+              <Text style={styles.btnSecondaryText}>
+                Already have an account?{'  '}
+                <Text style={styles.btnSecondaryAccent}>Sign in</Text>
+              </Text>
+            </Pressable>
           </Animated.View>
-        </ScrollView>
+        </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
-const createStyles = (c: ThemeColors, isDark: boolean) =>
-  StyleSheet.create({
-    root: { flex: 1, backgroundColor: c.background },
+const createStyles = (c: ThemeColors, isDark: boolean) => {
+  const heroTextColor  = isDark ? c.background   : '#FFFFFF';
+  const heroBadgeBg    = isDark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)';
+  const heroBadgeBorder = isDark ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.28)';
+  const heroBadgeText  = isDark ? c.background   : 'rgba(255,255,255,0.92)';
+
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.primary },
     scroll: { flexGrow: 1 },
 
-    // ── Hero (top image section) ──
+    // ── Hero ──
     hero: {
-      marginHorizontal: SPACING.xl,
-      marginTop: SPACING.md,
-      borderRadius: RADIUS.xl,
-      overflow: 'hidden',
-      aspectRatio: 16 / 9,
-      justifyContent: 'center',
+      backgroundColor: c.primary,
+      paddingTop: SPACING.xl,
+      paddingBottom: SPACING.xxl + 28,
+      paddingHorizontal: SPACING.xxl,
       alignItems: 'center',
-      paddingHorizontal: SPACING.xl,
-      paddingVertical: SPACING.xxl,
     },
-    heroImage: {
-      width: '100%',
-      height: '100%',
-      ...(Platform.OS === 'web' ? ({ objectFit: 'contain', objectPosition: 'center center' } as any) : {}),
-    },
-    overlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(4, 22, 12, 0.58)',
-    },
+    heroContent: { alignItems: 'center', width: '100%' },
 
-    // ── Hero content (centered) ──
-    heroContent: {
-      alignItems: 'center',
-      gap: SPACING.md,
-    },
-
-    // Logo ring
     logoRing: {
       width: 108,
       height: 108,
@@ -247,7 +222,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       overflow: 'hidden',
       marginBottom: SPACING.lg,
       borderWidth: 3,
-      borderColor: 'rgba(255,255,255,0.28)',
+      borderColor: heroBadgeBorder,
     },
     logo: { width: '100%', height: '100%' },
 
@@ -255,35 +230,32 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       fontFamily: FONT_FAMILY,
       fontSize: 38,
       fontWeight: WEIGHT.bold,
-      color: '#FFFFFF',
+      color: heroTextColor,
       letterSpacing: 0.6,
       marginBottom: 8,
-      textAlign: 'center',
     },
     tagline: {
       fontFamily: FONT_FAMILY,
-      fontSize: TYPE.bodySmall,
+      fontSize: TYPE.body,
       fontWeight: WEIGHT.semibold,
-      color: 'rgba(255,255,255,0.78)',
-      lineHeight: 22,
+      color: isDark ? `${c.background}CC` : 'rgba(255,255,255,0.82)',
       textAlign: 'center',
-      maxWidth: 300,
+      lineHeight: 24,
+      marginBottom: SPACING.lg + 4,
+      maxWidth: 260,
     },
 
-    // Badges
     badgeRow: {
       flexDirection: 'row',
       gap: SPACING.sm,
-      marginTop: SPACING.sm,
-      justifyContent: 'center',
     },
     badge: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
-      backgroundColor: 'rgba(255,255,255,0.14)',
+      backgroundColor: heroBadgeBg,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.24)',
+      borderColor: heroBadgeBorder,
       borderRadius: RADIUS.pill,
       paddingVertical: 5,
       paddingHorizontal: 10,
@@ -291,7 +263,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
     badgeText: {
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.tiny,
-      color: 'rgba(255,255,255,0.9)',
+      color: heroBadgeText,
       fontWeight: WEIGHT.semibold,
       letterSpacing: 0.3,
     },
@@ -301,6 +273,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       backgroundColor: c.background,
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
+      marginTop: -28,
       flex: 1,
       paddingHorizontal: SPACING.xl,
       paddingTop: SPACING.xl + 4,
@@ -403,5 +376,6 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       fontWeight: WEIGHT.bold,
     },
   });
+};
 
 export default WelcomeScreen;
