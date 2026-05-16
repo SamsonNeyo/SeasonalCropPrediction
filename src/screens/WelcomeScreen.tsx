@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Image,
-  ImageBackground,
   Platform,
   Animated,
   Easing,
@@ -96,14 +95,6 @@ const WelcomeScreen = ({ navigation }: any) => {
             },
           ]}
         >
-          {/* Card background image */}
-          <Image
-            source={require('../../assets/hero-farmer.jpg')}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-          />
-          <View style={styles.cardOverlay} />
-
           {/* Top accent bar */}
           <View style={styles.accentBar} />
 
@@ -262,12 +253,7 @@ const createStyles = (c: ThemeColors) =>
       borderColor: c.glassBorder,
       paddingHorizontal: SPACING.xxl,
       paddingVertical: SPACING.xxl + 4,
-      overflow: 'hidden',
       ...elevation(c.shadow, 'xl'),
-    },
-    cardOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(255,255,255,0.83)',
     },
 
     // Accent bar at top of card
