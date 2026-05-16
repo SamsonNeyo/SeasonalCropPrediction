@@ -224,8 +224,9 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       paddingBottom: SPACING.xxl + 36,
     },
     heroImage: {
-      borderBottomLeftRadius: 0,
-      borderBottomRightRadius: 0,
+      width: '100%',
+      height: '100%',
+      ...(Platform.OS === 'web' ? ({ objectFit: 'cover', objectPosition: 'center center' } as any) : {}),
     },
     heroOverlay: {
       ...StyleSheet.absoluteFillObject,
