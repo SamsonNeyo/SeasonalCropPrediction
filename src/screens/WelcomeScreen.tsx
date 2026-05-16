@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Image,
-  ImageBackground,
   Platform,
   Animated,
   Easing,
@@ -83,12 +82,7 @@ const WelcomeScreen = ({ navigation }: any) => {
         bounces={false}
       >
         {/* ── Hero ── */}
-        <ImageBackground
-          source={require('../../assets/hero-farmer.jpg')}
-          style={styles.hero}
-          resizeMode="cover"
-        >
-          <View style={styles.heroOverlay} />
+        <View style={styles.hero}>
           <Animated.View
             style={[
               styles.heroContent,
@@ -125,7 +119,7 @@ const WelcomeScreen = ({ navigation }: any) => {
               </View>
             </View>
           </Animated.View>
-        </ImageBackground>
+        </View>
 
         {/* ── Content card ── */}
         <Animated.View
@@ -208,24 +202,16 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
   const heroBadgeText  = isDark ? c.background   : 'rgba(255,255,255,0.92)';
 
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: Platform.OS === 'web' ? c.background : c.primary },
-    scroll: {
-      flexGrow: 1,
-      ...(Platform.OS === 'web' ? { maxWidth: 500, width: '100%', alignSelf: 'center' } : {}),
-    },
+    root: { flex: 1, backgroundColor: c.primary },
+    scroll: { flexGrow: 1 },
 
     // ── Hero ──
     hero: {
-      overflow: 'hidden',
+      backgroundColor: c.primary,
       paddingTop: SPACING.xl,
       paddingBottom: SPACING.xxl + 28,
       paddingHorizontal: SPACING.xxl,
       alignItems: 'center',
-      ...(Platform.OS === 'web' ? { borderRadius: RADIUS.xxl, margin: SPACING.lg, marginBottom: 0 } : {}),
-    },
-    heroOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(4, 30, 15, 0.55)',
     },
     heroContent: { alignItems: 'center', width: '100%' },
 
@@ -292,6 +278,8 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       paddingHorizontal: SPACING.xl,
       paddingTop: SPACING.xl + 4,
       paddingBottom: SPACING.xxl,
+      maxWidth: Platform.OS === 'web' ? 500 : undefined,
+      alignSelf: Platform.OS === 'web' ? 'center' : undefined,
       width: '100%',
     },
 
