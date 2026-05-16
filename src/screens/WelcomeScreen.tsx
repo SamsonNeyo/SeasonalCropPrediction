@@ -10,7 +10,7 @@ import {
   Easing,
   ScrollView,
   Pressable,
-  Dimensions,
+
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,7 +20,6 @@ import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
 
 const HERO_IMAGE = require('../../assets/hero-farmer.jpg');
-const SCREEN_H = Dimensions.get('window').height;
 
 type Feature = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -214,17 +213,17 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
 
     // ── Hero (top image section) ──
     hero: {
-      minHeight: SCREEN_H * 0.52,
+      width: '100%',
+      aspectRatio: 3 / 2,
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: SPACING.xl,
-      paddingTop: SPACING.xl,
-      paddingBottom: SPACING.xxl + 36,
+      paddingVertical: SPACING.xxl,
     },
     heroImage: {
       width: '100%',
       height: '100%',
-      ...(Platform.OS === 'web' ? ({ objectFit: 'cover', objectPosition: 'center center' } as any) : {}),
+      ...(Platform.OS === 'web' ? ({ objectFit: 'contain', objectPosition: 'center center' } as any) : {}),
     },
     overlay: {
       ...StyleSheet.absoluteFillObject,
