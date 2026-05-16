@@ -107,21 +107,18 @@ const WelcomeScreen = ({ navigation }: any) => {
               },
             ]}
           >
-            {/* Brand pill */}
-            <View style={styles.brandPill}>
+            {/* Logo */}
+            <View style={styles.logoRing}>
               <Image
                 source={require('../../assets/splash-icon.png')}
-                style={styles.brandLogo}
+                style={styles.logo}
                 resizeMode="cover"
               />
-              <Text style={styles.brandName}>SmartCrop</Text>
             </View>
 
-            {/* Headline */}
-            <Text style={styles.headline}>Grow smarter,{'\n'}harvest better.</Text>
-            <Text style={styles.tagline}>
-              AI-powered crop recommendations built for Luwero farmers.
-            </Text>
+            {/* Brand */}
+            <Text style={styles.appName}>SmartCrop</Text>
+            <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
 
             {/* Trust badges */}
             <View style={styles.badgeRow}>
@@ -237,40 +234,25 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       gap: SPACING.md,
     },
 
-    // Brand pill
-    brandPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.25)',
-      borderRadius: RADIUS.pill,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      marginBottom: SPACING.sm,
+    // Logo ring
+    logoRing: {
+      width: 108,
+      height: 108,
+      borderRadius: 30,
+      overflow: 'hidden',
+      marginBottom: SPACING.lg,
+      borderWidth: 3,
+      borderColor: 'rgba(255,255,255,0.28)',
     },
-    brandLogo: {
-      width: 20,
-      height: 20,
-      borderRadius: 5,
-    },
-    brandName: {
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.bodySmall,
-      fontWeight: WEIGHT.bold,
-      color: '#fff',
-      letterSpacing: 0.4,
-    },
+    logo: { width: '100%', height: '100%' },
 
-    // Headline & tagline
-    headline: {
+    appName: {
       fontFamily: FONT_FAMILY,
-      fontSize: 36,
+      fontSize: 38,
       fontWeight: WEIGHT.bold,
       color: '#FFFFFF',
-      lineHeight: 44,
-      letterSpacing: -0.5,
+      letterSpacing: 0.6,
+      marginBottom: 8,
       textAlign: 'center',
     },
     tagline: {
