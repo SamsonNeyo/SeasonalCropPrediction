@@ -208,8 +208,11 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
   const heroBadgeText  = isDark ? c.background   : 'rgba(255,255,255,0.92)';
 
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: c.primary },
-    scroll: { flexGrow: 1 },
+    root: { flex: 1, backgroundColor: Platform.OS === 'web' ? c.background : c.primary },
+    scroll: {
+      flexGrow: 1,
+      ...(Platform.OS === 'web' ? { maxWidth: 500, width: '100%', alignSelf: 'center' } : {}),
+    },
 
     // ── Hero ──
     hero: {
@@ -218,6 +221,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       paddingBottom: SPACING.xxl + 28,
       paddingHorizontal: SPACING.xxl,
       alignItems: 'center',
+      ...(Platform.OS === 'web' ? { borderRadius: RADIUS.xxl, margin: SPACING.lg, marginBottom: 0 } : {}),
     },
     heroOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -288,8 +292,6 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       paddingHorizontal: SPACING.xl,
       paddingTop: SPACING.xl + 4,
       paddingBottom: SPACING.xxl,
-      maxWidth: Platform.OS === 'web' ? 500 : undefined,
-      alignSelf: Platform.OS === 'web' ? 'center' : undefined,
       width: '100%',
     },
 
