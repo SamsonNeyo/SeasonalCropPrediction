@@ -86,7 +86,7 @@ const WelcomeScreen = ({ navigation }: any) => {
         <ImageBackground
           source={require('../../assets/hero-farmer.jpg')}
           style={styles.hero}
-          resizeMode="contain"
+          resizeMode="cover"
         >
           <View style={styles.heroOverlay} />
           <Animated.View
@@ -217,7 +217,6 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     // ── Hero ──
     hero: {
       overflow: 'hidden',
-      backgroundColor: 'rgba(4, 30, 15, 0.92)',
       paddingTop: SPACING.xl,
       paddingBottom: SPACING.xxl + 28,
       paddingHorizontal: SPACING.xxl,
@@ -226,7 +225,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     },
     heroOverlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(4, 30, 15, 0.35)',
+      backgroundColor: 'rgba(4, 30, 15, 0.55)',
     },
     heroContent: { alignItems: 'center', width: '100%' },
 
