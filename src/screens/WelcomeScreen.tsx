@@ -213,11 +213,11 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
 
     // ── Hero (top image section) ──
     hero: {
-      marginHorizontal: SPACING.lg,
+      marginHorizontal: SPACING.xl,
       marginTop: SPACING.md,
       borderRadius: RADIUS.xl,
       overflow: 'hidden',
-      aspectRatio: 3 / 2,
+      aspectRatio: 16 / 9,
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: SPACING.xl,
