@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   Image,
+  ImageBackground,
   Platform,
   Animated,
   Easing,
@@ -82,7 +83,12 @@ const WelcomeScreen = ({ navigation }: any) => {
         bounces={false}
       >
         {/* ── Hero ── */}
-        <View style={styles.hero}>
+        <ImageBackground
+          source={require('../../assets/hero-farmer.jpg')}
+          style={styles.hero}
+          resizeMode="cover"
+        >
+          <View style={styles.heroOverlay} />
           <Animated.View
             style={[
               styles.heroContent,
@@ -119,7 +125,7 @@ const WelcomeScreen = ({ navigation }: any) => {
               </View>
             </View>
           </Animated.View>
-        </View>
+        </ImageBackground>
 
         {/* ── Content card ── */}
         <Animated.View
@@ -207,11 +213,15 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
 
     // ── Hero ──
     hero: {
-      backgroundColor: c.primary,
+      overflow: 'hidden',
       paddingTop: SPACING.xl,
       paddingBottom: SPACING.xxl + 28,
       paddingHorizontal: SPACING.xxl,
       alignItems: 'center',
+    },
+    heroOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(4, 30, 15, 0.55)',
     },
     heroContent: { alignItems: 'center', width: '100%' },
 
