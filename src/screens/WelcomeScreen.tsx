@@ -80,22 +80,22 @@ const WelcomeScreen = ({ navigation }: any) => {
   }, [heroAnim, cardAnim, btnAnim]);
 
   return (
-    <SafeAreaView style={styles.root}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        {/* ── Hero image ── */}
-        <ImageBackground
-          source={HERO_IMAGE}
-          style={styles.hero}
-          imageStyle={styles.heroImage}
-          resizeMode="cover"
-        >
-          {/* Dark overlay */}
-          <View style={styles.heroOverlay} />
+    <ImageBackground
+      source={HERO_IMAGE}
+      style={styles.root}
+      imageStyle={styles.heroImage}
+      resizeMode="cover"
+    >
+      {/* Full-screen dark overlay */}
+      <View style={styles.overlay} />
 
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* ── Centered hero content ── */}
           <Animated.View
             style={[
               styles.heroContent,
@@ -135,104 +135,105 @@ const WelcomeScreen = ({ navigation }: any) => {
               </View>
             </View>
           </Animated.View>
-        </ImageBackground>
 
-        {/* ── Content card ── */}
-        <Animated.View
-          style={[
-            styles.card,
-            {
-              opacity: cardAnim,
-              transform: [{
-                translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }),
-              }],
-            },
-          ]}
-        >
-          {/* Section label */}
-          <View style={styles.sectionLabelRow}>
-            <View style={styles.sectionDot} />
-            <Text style={styles.sectionLabel}>What you get</Text>
-            <View style={styles.sectionLine} />
-          </View>
-
-          {/* Features */}
-          <View style={styles.features}>
-            {FEATURES.map((f) => (
-              <View key={f.title} style={styles.featureRow}>
-                <View style={styles.featureIcon}>
-                  <MaterialCommunityIcons name={f.icon} size={20} color={colors.primary} />
-                </View>
-                <View style={styles.featureText}>
-                  <Text style={styles.featureTitle}>{f.title}</Text>
-                  <Text style={styles.featureBody}>{f.body}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* Actions */}
+          {/* ── Content card ── */}
           <Animated.View
             style={[
-              styles.actions,
+              styles.card,
               {
-                opacity: btnAnim,
+                opacity: cardAnim,
                 transform: [{
-                  translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+                  translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }),
                 }],
               },
             ]}
           >
-            <Pressable
-              style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
-              onPress={() => navigation.navigate('Signup')}
-              accessibilityRole="button"
-              accessibilityLabel="Get started"
-            >
-              <Text style={styles.btnPrimaryText}>Get Started</Text>
-              <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
-            </Pressable>
+            {/* Section label */}
+            <View style={styles.sectionLabelRow}>
+              <View style={styles.sectionDot} />
+              <Text style={styles.sectionLabel}>What you get</Text>
+              <View style={styles.sectionLine} />
+            </View>
 
-            <Pressable
-              style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
-              onPress={() => navigation.navigate('Login')}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in"
+            {/* Features */}
+            <View style={styles.features}>
+              {FEATURES.map((f) => (
+                <View key={f.title} style={styles.featureRow}>
+                  <View style={styles.featureIcon}>
+                    <MaterialCommunityIcons name={f.icon} size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.featureText}>
+                    <Text style={styles.featureTitle}>{f.title}</Text>
+                    <Text style={styles.featureBody}>{f.body}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Actions */}
+            <Animated.View
+              style={[
+                styles.actions,
+                {
+                  opacity: btnAnim,
+                  transform: [{
+                    translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+                  }],
+                },
+              ]}
             >
-              <Text style={styles.btnSecondaryText}>
-                Already have an account?{'  '}
-                <Text style={styles.btnSecondaryAccent}>Sign in</Text>
-              </Text>
-            </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
+                onPress={() => navigation.navigate('Signup')}
+                accessibilityRole="button"
+                accessibilityLabel="Get started"
+              >
+                <Text style={styles.btnPrimaryText}>Get Started</Text>
+                <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
+                onPress={() => navigation.navigate('Login')}
+                accessibilityRole="button"
+                accessibilityLabel="Sign in"
+              >
+                <Text style={styles.btnSecondaryText}>
+                  Already have an account?{'  '}
+                  <Text style={styles.btnSecondaryAccent}>Sign in</Text>
+                </Text>
+              </Pressable>
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 const createStyles = (c: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
-    root: { flex: 1, backgroundColor: c.background },
+    root: { flex: 1 },
+    safeArea: { flex: 1, backgroundColor: 'transparent' },
     scroll: { flexGrow: 1 },
 
-    // ── Hero ──
-    hero: {
-      minHeight: SCREEN_H * 0.52,
-      justifyContent: 'flex-end',
-      paddingHorizontal: SPACING.xl,
-      paddingBottom: SPACING.xxl + 36,
-    },
+    // Full-screen image
     heroImage: {
       width: '100%',
       height: '100%',
       ...(Platform.OS === 'web' ? ({ objectFit: 'cover', objectPosition: 'center center' } as any) : {}),
     },
-    heroOverlay: {
+    overlay: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: 'rgba(4, 22, 12, 0.58)',
     },
+
+    // ── Hero content (centered) ──
     heroContent: {
+      minHeight: SCREEN_H * 0.48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: SPACING.xl,
       gap: SPACING.md,
     },
 
@@ -241,7 +242,6 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.sm,
-      alignSelf: 'flex-start',
       backgroundColor: 'rgba(255,255,255,0.15)',
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.25)',
@@ -271,6 +271,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       color: '#FFFFFF',
       lineHeight: 44,
       letterSpacing: -0.5,
+      textAlign: 'center',
     },
     tagline: {
       fontFamily: FONT_FAMILY,
@@ -278,6 +279,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       fontWeight: WEIGHT.semibold,
       color: 'rgba(255,255,255,0.78)',
       lineHeight: 22,
+      textAlign: 'center',
       maxWidth: 300,
     },
 
@@ -286,6 +288,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       flexDirection: 'row',
       gap: SPACING.sm,
       marginTop: SPACING.sm,
+      justifyContent: 'center',
     },
     badge: {
       flexDirection: 'row',
@@ -311,7 +314,6 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
       backgroundColor: c.background,
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
-      marginTop: -32,
       flex: 1,
       paddingHorizontal: SPACING.xl,
       paddingTop: SPACING.xl + 4,
