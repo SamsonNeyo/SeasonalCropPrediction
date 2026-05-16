@@ -16,7 +16,6 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
-import { elevation } from '../constants/elevation';
 
 type Feature = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -31,6 +30,11 @@ const FEATURES: Feature[] = [
     body: 'Ranked crop choices tailored to your sub-county and current season.',
   },
   {
+    icon: 'brain',
+    title: 'AI crop advisor',
+    body: 'Ask any farming question and get instant, expert-level guidance.',
+  },
+  {
     icon: 'weather-partly-cloudy',
     title: 'Weather-aware guidance',
     body: 'Planning hints that adapt to real-time field conditions.',
@@ -43,77 +47,54 @@ const FEATURES: Feature[] = [
 ];
 
 const WelcomeScreen = ({ navigation }: any) => {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
-  const cardAnim    = useRef(new Animated.Value(0)).current;
-  const contentAnim = useRef(new Animated.Value(0)).current;
-  const btnAnim     = useRef(new Animated.Value(0)).current;
+  const heroAnim = useRef(new Animated.Value(0)).current;
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  const btnAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.stagger(140, [
+    Animated.stagger(160, [
+      Animated.timing(heroAnim, {
+        toValue: 1, duration: 700,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
       Animated.timing(cardAnim, {
         toValue: 1, duration: 620,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.timing(contentAnim, {
-        toValue: 1, duration: 560,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
       Animated.timing(btnAnim, {
-        toValue: 1, duration: 480,
+        toValue: 1, duration: 520,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
-  }, [cardAnim, contentAnim, btnAnim]);
+  }, [heroAnim, cardAnim, btnAnim]);
 
   return (
     <SafeAreaView style={styles.root}>
-      {/* Background orbs */}
-      <View style={[styles.orbTopRight, { pointerEvents: 'none' }]} />
-      <View style={[styles.orbBottomLeft, { pointerEvents: 'none' }]} />
-      <View style={[styles.orbMidRight, { pointerEvents: 'none' }]} />
-
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        {/* ── Glass card ── */}
-        <Animated.View
-          style={[
-            styles.card,
-            {
-              opacity: cardAnim,
-              transform: [{
-                translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
-              }, {
-                scale: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }),
-              }],
-            },
-          ]}
-        >
-          {/* Top accent bar */}
-          <View style={styles.accentBar} />
-
-          {/* Corner marks */}
-          <View style={[styles.cornerTL, { pointerEvents: 'none' }]} />
-          <View style={[styles.cornerBR, { pointerEvents: 'none' }]} />
-
-          {/* ── Brand section ── */}
+        {/* ── Hero ── */}
+        <View style={styles.hero}>
           <Animated.View
             style={[
-              styles.brand,
+              styles.heroContent,
               {
-                opacity: contentAnim,
+                opacity: heroAnim,
                 transform: [{
-                  translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+                  translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
                 }],
               },
             ]}
           >
+            {/* Logo */}
             <View style={styles.logoRing}>
               <Image
                 source={require('../../assets/splash-icon.png')}
@@ -122,34 +103,49 @@ const WelcomeScreen = ({ navigation }: any) => {
               />
             </View>
 
+            {/* Brand */}
             <Text style={styles.appName}>SmartCrop</Text>
-            <Text style={styles.tagline}>Your seasonal crop guide</Text>
-            <Text style={styles.description}>
-              Personalized recommendations for Luwero farmers backed by weather data and soil science.
-            </Text>
-          </Animated.View>
+            <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
 
-          {/* ── Divider ── */}
-          <Animated.View style={[styles.dividerWrap, { opacity: contentAnim }]}>
-            <View style={styles.dividerLine} />
+            {/* Trust badges */}
+            <View style={styles.badgeRow}>
+              <View style={styles.badge}>
+                <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
+                <Text style={styles.badgeText}>Luwero District</Text>
+              </View>
+              <View style={styles.badge}>
+                <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
+                <Text style={styles.badgeText}>Free to use</Text>
+              </View>
+            </View>
           </Animated.View>
+        </View>
 
-          {/* ── Features ── */}
-          <Animated.View
-            style={[
-              styles.features,
-              {
-                opacity: contentAnim,
-                transform: [{
-                  translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }),
-                }],
-              },
-            ]}
-          >
+        {/* ── Content card ── */}
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              opacity: cardAnim,
+              transform: [{
+                translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }),
+              }],
+            },
+          ]}
+        >
+          {/* What you get label */}
+          <View style={styles.sectionLabelRow}>
+            <View style={styles.sectionDot} />
+            <Text style={styles.sectionLabel}>What you get</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          {/* Features */}
+          <View style={styles.features}>
             {FEATURES.map((f) => (
               <View key={f.title} style={styles.featureRow}>
                 <View style={styles.featureIcon}>
-                  <MaterialCommunityIcons name={f.icon} size={19} color={colors.primary} />
+                  <MaterialCommunityIcons name={f.icon} size={20} color={colors.primary} />
                 </View>
                 <View style={styles.featureText}>
                   <Text style={styles.featureTitle}>{f.title}</Text>
@@ -157,16 +153,16 @@ const WelcomeScreen = ({ navigation }: any) => {
                 </View>
               </View>
             ))}
-          </Animated.View>
+          </View>
 
-          {/* ── Actions ── */}
+          {/* Actions */}
           <Animated.View
             style={[
               styles.actions,
               {
                 opacity: btnAnim,
                 transform: [{
-                  translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
+                  translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
                 }],
               },
             ]}
@@ -199,157 +195,133 @@ const WelcomeScreen = ({ navigation }: any) => {
   );
 };
 
-const createStyles = (c: ThemeColors) =>
-  StyleSheet.create({
-    root: { flex: 1, backgroundColor: c.background },
+const createStyles = (c: ThemeColors, isDark: boolean) => {
+  const heroTextColor  = isDark ? c.background   : '#FFFFFF';
+  const heroBadgeBg    = isDark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)';
+  const heroBadgeBorder = isDark ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.28)';
+  const heroBadgeText  = isDark ? c.background   : 'rgba(255,255,255,0.92)';
 
-    // Background orbs
-    orbTopRight: {
-      position: 'absolute',
-      width: 280,
-      height: 280,
-      borderRadius: 140,
-      backgroundColor: c.iconBg,
-      top: -80,
-      right: -80,
-      opacity: 0.9,
-    },
-    orbBottomLeft: {
-      position: 'absolute',
-      width: 240,
-      height: 240,
-      borderRadius: 120,
-      backgroundColor: c.pillBg,
-      bottom: -60,
-      left: -70,
-      opacity: 0.85,
-    },
-    orbMidRight: {
-      position: 'absolute',
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      backgroundColor: c.iconBg,
-      top: '45%',
-      right: -40,
-      opacity: 0.5,
-    },
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.primary },
+    scroll: { flexGrow: 1 },
 
-    scroll: {
-      flexGrow: 1,
-      padding: SPACING.xxl,
-      paddingVertical: SPACING.xl,
-    },
-
-    // Glass card
-    card: {
-      width: '100%',
-      maxWidth: Platform.OS === 'web' ? 480 : undefined,
-      alignSelf: 'center',
-      marginVertical: 'auto',
-      backgroundColor: c.glass,
-      borderRadius: RADIUS.xxl,
-      borderWidth: 1,
-      borderColor: c.glassBorder,
-      paddingHorizontal: SPACING.xxl,
-      paddingVertical: SPACING.xxl + 4,
-      ...elevation(c.shadow, 'xl'),
-    },
-
-    // Accent bar at top of card
-    accentBar: {
-      width: 52,
-      height: 4,
-      borderRadius: RADIUS.pill,
+    // ── Hero ──
+    hero: {
       backgroundColor: c.primary,
-      alignSelf: 'center',
-      marginBottom: SPACING.lg,
-      opacity: 0.85,
+      paddingTop: SPACING.xl,
+      paddingBottom: SPACING.xxl + 28,
+      paddingHorizontal: SPACING.xxl,
+      alignItems: 'center',
     },
+    heroContent: { alignItems: 'center', width: '100%' },
 
-    // Corner marks
-    cornerTL: {
-      position: 'absolute',
-      top: 16,
-      left: 16,
-      width: 24,
-      height: 24,
-      borderTopWidth: 2,
-      borderLeftWidth: 2,
-      borderColor: c.primary,
-      borderTopLeftRadius: 12,
-      opacity: 0.7,
-    },
-    cornerBR: {
-      position: 'absolute',
-      bottom: 16,
-      right: 16,
-      width: 24,
-      height: 24,
-      borderBottomWidth: 2,
-      borderRightWidth: 2,
-      borderColor: c.primary,
-      borderBottomRightRadius: 12,
-      opacity: 0.7,
-    },
-
-    // Brand
-    brand: { alignItems: 'center', marginBottom: SPACING.lg },
     logoRing: {
-      width: 92,
-      height: 92,
-      borderRadius: 24,
+      width: 108,
+      height: 108,
+      borderRadius: 30,
       overflow: 'hidden',
-      marginBottom: SPACING.md,
-      borderWidth: 1,
-      borderColor: c.glassBorder,
-      ...elevation(c.shadow, 'sm'),
+      marginBottom: SPACING.lg,
+      borderWidth: 3,
+      borderColor: heroBadgeBorder,
     },
     logo: { width: '100%', height: '100%' },
 
     appName: {
       fontFamily: FONT_FAMILY,
-      fontSize: 30,
+      fontSize: 38,
       fontWeight: WEIGHT.bold,
-      color: c.primary,
-      letterSpacing: 0.4,
-      marginBottom: 6,
+      color: heroTextColor,
+      letterSpacing: 0.6,
+      marginBottom: 8,
     },
     tagline: {
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.body,
       fontWeight: WEIGHT.semibold,
-      color: c.text,
-      marginBottom: 8,
+      color: isDark ? `${c.background}CC` : 'rgba(255,255,255,0.82)',
       textAlign: 'center',
+      lineHeight: 24,
+      marginBottom: SPACING.lg + 4,
+      maxWidth: 260,
     },
-    description: {
+
+    badgeRow: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: heroBadgeBg,
+      borderWidth: 1,
+      borderColor: heroBadgeBorder,
+      borderRadius: RADIUS.pill,
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+    },
+    badgeText: {
       fontFamily: FONT_FAMILY,
-      fontSize: TYPE.bodySmall,
+      fontSize: TYPE.tiny,
+      color: heroBadgeText,
+      fontWeight: WEIGHT.semibold,
+      letterSpacing: 0.3,
+    },
+
+    // ── Card ──
+    card: {
+      backgroundColor: c.background,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      marginTop: -28,
+      flex: 1,
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING.xl + 4,
+      paddingBottom: SPACING.xxl,
+      maxWidth: Platform.OS === 'web' ? 500 : undefined,
+      alignSelf: Platform.OS === 'web' ? 'center' : undefined,
+      width: '100%',
+    },
+
+    // Section label
+    sectionLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      marginBottom: SPACING.lg,
+    },
+    sectionDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: c.primary,
+    },
+    sectionLabel: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      fontWeight: WEIGHT.bold,
       color: c.lightText,
-      textAlign: 'center',
-      lineHeight: 21,
-      maxWidth: 300,
+      letterSpacing: 1.1,
+      textTransform: 'uppercase',
     },
-
-    // Divider
-    dividerWrap: { marginVertical: SPACING.lg },
-    dividerLine: {
+    sectionLine: {
+      flex: 1,
       height: 1,
-      backgroundColor: c.glassBorder,
+      backgroundColor: c.border,
+      opacity: 0.6,
     },
 
-    // Features
-    features: { gap: SPACING.md, marginBottom: SPACING.xl },
+    // ── Features ──
+    features: { gap: SPACING.md + 4, marginBottom: SPACING.xl + 4 },
     featureRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: SPACING.md,
     },
     featureIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 11,
+      width: 46,
+      height: 46,
+      borderRadius: RADIUS.md,
       backgroundColor: c.iconBg,
       borderWidth: 1,
       borderColor: c.pillBorder,
@@ -357,7 +329,7 @@ const createStyles = (c: ThemeColors) =>
       justifyContent: 'center',
       flexShrink: 0,
     },
-    featureText: { flex: 1, paddingTop: 1 },
+    featureText: { flex: 1, paddingTop: 2 },
     featureTitle: {
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.bodySmall,
@@ -372,10 +344,10 @@ const createStyles = (c: ThemeColors) =>
       lineHeight: 18,
     },
 
-    // Actions
+    // ── Actions ──
     actions: { gap: SPACING.md },
     btnPrimary: {
-      height: 54,
+      height: 56,
       backgroundColor: c.primary,
       borderRadius: RADIUS.pill,
       flexDirection: 'row',
@@ -388,7 +360,7 @@ const createStyles = (c: ThemeColors) =>
       fontSize: TYPE.body,
       fontWeight: WEIGHT.bold,
       color: '#fff',
-      letterSpacing: 0.2,
+      letterSpacing: 0.3,
     },
     btnSecondary: {
       alignItems: 'center',
@@ -404,5 +376,6 @@ const createStyles = (c: ThemeColors) =>
       fontWeight: WEIGHT.bold,
     },
   });
+};
 
 export default WelcomeScreen;
