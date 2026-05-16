@@ -80,22 +80,21 @@ const WelcomeScreen = ({ navigation }: any) => {
   }, [heroAnim, cardAnim, btnAnim]);
 
   return (
-    <ImageBackground
-      source={HERO_IMAGE}
-      style={styles.root}
-      imageStyle={styles.heroImage}
-      resizeMode="cover"
-    >
-      {/* Full-screen dark overlay */}
-      <View style={styles.overlay} />
-
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
+    <SafeAreaView style={styles.root}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* ── Hero image (top only) ── */}
+        <ImageBackground
+          source={HERO_IMAGE}
+          style={styles.hero}
+          imageStyle={styles.heroImage}
+          resizeMode="cover"
         >
-          {/* ── Centered hero content ── */}
+          <View style={styles.overlay} />
+
           <Animated.View
             style={[
               styles.heroContent,
@@ -132,8 +131,9 @@ const WelcomeScreen = ({ navigation }: any) => {
               </View>
             </View>
           </Animated.View>
+        </ImageBackground>
 
-          {/* ── Content card ── */}
+        {/* ── Content card ── */}
           <Animated.View
             style={[
               styles.card,
@@ -203,18 +203,24 @@ const WelcomeScreen = ({ navigation }: any) => {
             </Animated.View>
           </Animated.View>
         </ScrollView>
-      </SafeAreaView>
-    </ImageBackground>
+    </SafeAreaView>
   );
 };
 
 const createStyles = (c: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
-    root: { flex: 1 },
-    safeArea: { flex: 1, backgroundColor: 'transparent' },
+    root: { flex: 1, backgroundColor: c.background },
     scroll: { flexGrow: 1 },
 
-    // Full-screen image
+    // ── Hero (top image section) ──
+    hero: {
+      minHeight: SCREEN_H * 0.52,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING.xl,
+      paddingBottom: SPACING.xxl + 36,
+    },
     heroImage: {
       width: '100%',
       height: '100%',
@@ -227,10 +233,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) =>
 
     // ── Hero content (centered) ──
     heroContent: {
-      minHeight: SCREEN_H * 0.48,
       alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: SPACING.xl,
       gap: SPACING.md,
     },
 
