@@ -4,11 +4,13 @@ import {
   Text,
   StyleSheet,
   Image,
+  ImageBackground,
   Platform,
   Animated,
   Easing,
   ScrollView,
   Pressable,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +18,9 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
+
+const HERO_IMAGE = require('../../assets/hero-farmer.jpg');
+const SCREEN_H = Dimensions.get('window').height;
 
 type Feature = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -55,14 +60,14 @@ const WelcomeScreen = ({ navigation }: any) => {
   const btnAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.stagger(160, [
+    Animated.stagger(180, [
       Animated.timing(heroAnim, {
-        toValue: 1, duration: 700,
+        toValue: 1, duration: 800,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(cardAnim, {
-        toValue: 1, duration: 620,
+        toValue: 1, duration: 650,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -81,45 +86,56 @@ const WelcomeScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* ── Hero ── */}
-        <View style={styles.hero}>
+        {/* ── Hero image ── */}
+        <ImageBackground
+          source={HERO_IMAGE}
+          style={styles.hero}
+          imageStyle={styles.heroImage}
+          resizeMode="cover"
+        >
+          {/* Dark overlay */}
+          <View style={styles.heroOverlay} />
+
           <Animated.View
             style={[
               styles.heroContent,
               {
                 opacity: heroAnim,
                 transform: [{
-                  translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
+                  translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }),
                 }],
               },
             ]}
           >
-            {/* Logo */}
-            <View style={styles.logoRing}>
+            {/* Brand pill */}
+            <View style={styles.brandPill}>
               <Image
                 source={require('../../assets/splash-icon.png')}
-                style={styles.logo}
+                style={styles.brandLogo}
                 resizeMode="cover"
               />
+              <Text style={styles.brandName}>SmartCrop</Text>
             </View>
 
-            {/* Brand */}
-            <Text style={styles.appName}>SmartCrop</Text>
-            <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
+            {/* Headline */}
+            <Text style={styles.headline}>Grow smarter,{'\n'}harvest better.</Text>
+            <Text style={styles.tagline}>
+              AI-powered crop recommendations built for Luwero farmers.
+            </Text>
 
             {/* Trust badges */}
             <View style={styles.badgeRow}>
               <View style={styles.badge}>
-                <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
+                <MaterialCommunityIcons name="map-marker-outline" size={12} color="rgba(255,255,255,0.9)" />
                 <Text style={styles.badgeText}>Luwero District</Text>
               </View>
               <View style={styles.badge}>
-                <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
+                <MaterialCommunityIcons name="shield-check-outline" size={12} color="rgba(255,255,255,0.9)" />
                 <Text style={styles.badgeText}>Free to use</Text>
               </View>
             </View>
           </Animated.View>
-        </View>
+        </ImageBackground>
 
         {/* ── Content card ── */}
         <Animated.View
@@ -133,7 +149,7 @@ const WelcomeScreen = ({ navigation }: any) => {
             },
           ]}
         >
-          {/* What you get label */}
+          {/* Section label */}
           <View style={styles.sectionLabelRow}>
             <View style={styles.sectionDot} />
             <Text style={styles.sectionLabel}>What you get</Text>
@@ -195,67 +211,88 @@ const WelcomeScreen = ({ navigation }: any) => {
   );
 };
 
-const createStyles = (c: ThemeColors, isDark: boolean) => {
-  const heroTextColor  = isDark ? c.background   : '#FFFFFF';
-  const heroBadgeBg    = isDark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)';
-  const heroBadgeBorder = isDark ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.28)';
-  const heroBadgeText  = isDark ? c.background   : 'rgba(255,255,255,0.92)';
-
-  return StyleSheet.create({
-    root: { flex: 1, backgroundColor: c.primary },
+const createStyles = (c: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.background },
     scroll: { flexGrow: 1 },
 
     // ── Hero ──
     hero: {
-      backgroundColor: c.primary,
-      paddingTop: SPACING.xl,
-      paddingBottom: SPACING.xxl + 28,
-      paddingHorizontal: SPACING.xxl,
+      minHeight: SCREEN_H * 0.52,
+      justifyContent: 'flex-end',
+      paddingHorizontal: SPACING.xl,
+      paddingBottom: SPACING.xxl + 36,
+    },
+    heroImage: {
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+    },
+    heroOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(4, 22, 12, 0.58)',
+    },
+    heroContent: {
+      gap: SPACING.md,
+    },
+
+    // Brand pill
+    brandPill: {
+      flexDirection: 'row',
       alignItems: 'center',
+      gap: SPACING.sm,
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+      borderRadius: RADIUS.pill,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      marginBottom: SPACING.sm,
     },
-    heroContent: { alignItems: 'center', width: '100%' },
-
-    logoRing: {
-      width: 108,
-      height: 108,
-      borderRadius: 30,
-      overflow: 'hidden',
-      marginBottom: SPACING.lg,
-      borderWidth: 3,
-      borderColor: heroBadgeBorder,
+    brandLogo: {
+      width: 20,
+      height: 20,
+      borderRadius: 5,
     },
-    logo: { width: '100%', height: '100%' },
-
-    appName: {
+    brandName: {
       fontFamily: FONT_FAMILY,
-      fontSize: 38,
+      fontSize: TYPE.bodySmall,
       fontWeight: WEIGHT.bold,
-      color: heroTextColor,
-      letterSpacing: 0.6,
-      marginBottom: 8,
+      color: '#fff',
+      letterSpacing: 0.4,
+    },
+
+    // Headline & tagline
+    headline: {
+      fontFamily: FONT_FAMILY,
+      fontSize: 36,
+      fontWeight: WEIGHT.bold,
+      color: '#FFFFFF',
+      lineHeight: 44,
+      letterSpacing: -0.5,
     },
     tagline: {
       fontFamily: FONT_FAMILY,
-      fontSize: TYPE.body,
+      fontSize: TYPE.bodySmall,
       fontWeight: WEIGHT.semibold,
-      color: isDark ? `${c.background}CC` : 'rgba(255,255,255,0.82)',
-      textAlign: 'center',
-      lineHeight: 24,
-      marginBottom: SPACING.lg + 4,
-      maxWidth: 260,
+      color: 'rgba(255,255,255,0.78)',
+      lineHeight: 22,
+      maxWidth: 300,
     },
 
+    // Badges
     badgeRow: {
       flexDirection: 'row',
       gap: SPACING.sm,
+      marginTop: SPACING.sm,
     },
     badge: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
-      backgroundColor: heroBadgeBg,
+      backgroundColor: 'rgba(255,255,255,0.14)',
       borderWidth: 1,
-      borderColor: heroBadgeBorder,
+      borderColor: 'rgba(255,255,255,0.24)',
       borderRadius: RADIUS.pill,
       paddingVertical: 5,
       paddingHorizontal: 10,
@@ -263,7 +300,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     badgeText: {
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.tiny,
-      color: heroBadgeText,
+      color: 'rgba(255,255,255,0.9)',
       fontWeight: WEIGHT.semibold,
       letterSpacing: 0.3,
     },
@@ -273,7 +310,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       backgroundColor: c.background,
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
-      marginTop: -28,
+      marginTop: -32,
       flex: 1,
       paddingHorizontal: SPACING.xl,
       paddingTop: SPACING.xl + 4,
@@ -376,6 +413,5 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       fontWeight: WEIGHT.bold,
     },
   });
-};
 
 export default WelcomeScreen;
