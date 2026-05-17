@@ -1,5 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
+  Easing,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,7 +21,84 @@ import Button from '../components/Button';
 import TextField from '../components/TextField';
 import Card from '../components/Card';
 import SelectSheet, { SelectOption } from '../components/SelectSheet';
-import Skeleton, { SkeletonGroup } from '../components/Skeleton';
+
+const ZONE_MESSAGES = [
+  'Loading your sub-counties…',
+  'Fetching Luwero region data…',
+  'Mapping soil zones…',
+  'Almost ready…',
+];
+
+const ZoneLoader = () => {
+  const { colors } = useTheme();
+  const [msgIdx, setMsgIdx] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const cycle = setInterval(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0, duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setMsgIdx((i) => (i + 1) % ZONE_MESSAGES.length);
+        Animated.timing(fadeAnim, {
+          toValue: 1, duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 3000);
+    return () => clearInterval(cycle);
+  }, [fadeAnim]);
+
+  return (
+    <View style={{
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xl,
+      paddingHorizontal: SPACING.xxl,
+      backgroundColor: colors.background,
+    }}>
+      <View style={{
+        width: 72,
+        height: 72,
+        borderRadius: 22,
+        backgroundColor: colors.iconBg,
+        borderWidth: 1,
+        borderColor: colors.pillBorder,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <MaterialCommunityIcons name="map-marker-outline" size={34} color={colors.primary} />
+      </View>
+
+      <ActivityIndicator size="large" color={colors.primary} />
+
+      <Animated.View style={{ opacity: fadeAnim, alignItems: 'center', gap: SPACING.sm }}>
+        <Text style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: TYPE.body,
+          fontWeight: WEIGHT.bold,
+          color: colors.text,
+          textAlign: 'center',
+        }}>
+          {ZONE_MESSAGES[msgIdx]}
+        </Text>
+        <Text style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: TYPE.caption,
+          color: colors.lightText,
+          textAlign: 'center',
+          lineHeight: 18,
+        }}>
+          Finding the best crops for your location
+        </Text>
+      </Animated.View>
+    </View>
+  );
+};
 
 const ProfileSetupScreen = () => {
   const { colors } = useTheme();
@@ -30,7 +110,6 @@ const ProfileSetupScreen = () => {
   const [soilType, setSoilType] = useState('');
   const [open, setOpen] = useState(false);
   const [loadingZones, setLoadingZones] = useState(true);
-  const [loadingHint, setLoadingHint] = useState('Loading sub-counties…');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,9 +117,7 @@ const ProfileSetupScreen = () => {
     const loadZones = async () => {
       try {
         setLoadingZones(true);
-        const t = setTimeout(() => setLoadingHint('Server is starting up, please wait…'), 10000);
         const payload = await getSoilZones();
-        clearTimeout(t);
         const list = payload?.soil_zones || [];
         setZones(list);
       } catch {
@@ -94,6 +171,15 @@ const ProfileSetupScreen = () => {
     [zones],
   );
 
+  if (loadingZones) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.bgAccent} />
+        <ZoneLoader />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
@@ -124,13 +210,7 @@ const ProfileSetupScreen = () => {
           />
 
           <Text style={styles.fieldLabel}>Sub-county</Text>
-          {loadingZones ? (
-            <SkeletonGroup style={styles.skelGroup}>
-              <Skeleton height={48} borderRadius={RADIUS.md} />
-              <Text style={styles.loadingHintText}>{loadingHint}</Text>
-            </SkeletonGroup>
-          ) : (
-            <TouchableOpacity
+          <TouchableOpacity
               style={styles.selectField}
               onPress={() => setOpen(true)}
               accessibilityRole="button"
@@ -145,7 +225,6 @@ const ProfileSetupScreen = () => {
               </View>
               <MaterialCommunityIcons name="chevron-down" size={20} color={colors.lightText} />
             </TouchableOpacity>
-          )}
 
           {!!soilType && (
             <View style={styles.soilCard}>
