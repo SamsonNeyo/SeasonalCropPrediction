@@ -207,22 +207,38 @@ const WelcomeScreen = ({ navigation }: any) => {
               </Text>
             </Pressable>
 
+            {/* ── Divider ── */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
             {!!guestError && (
               <Text style={styles.guestError}>{guestError}</Text>
             )}
 
+            {/* ── Guest button ── */}
             <Pressable
-              style={({ pressed }) => [styles.btnGuest, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.btnGuest, pressed && { opacity: 0.75 }]}
               onPress={handleGuest}
               disabled={guestLoading}
               accessibilityRole="button"
               accessibilityLabel="Continue without signing in"
             >
-              {guestLoading
-                ? <ActivityIndicator size="small" color={colors.lightText} />
-                : <Text style={styles.btnGuestText}>Continue without signing in</Text>
-              }
+              {guestLoading ? (
+                <ActivityIndicator size="small" color={colors.lightText} />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="account-outline" size={18} color={colors.lightText} />
+                  <Text style={styles.btnGuestText}>Continue without signing in</Text>
+                </>
+              )}
             </Pressable>
+
+            <Text style={styles.guestNote}>
+              No account needed · Some features may be limited
+            </Text>
           </Animated.View>
         </Animated.View>
       </ScrollView>
@@ -410,16 +426,50 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       color: c.primary,
       fontWeight: WEIGHT.bold,
     },
-    btnGuest: {
+    divider: {
+      flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: SPACING.sm,
+      gap: SPACING.sm,
+      marginVertical: SPACING.xs,
+    },
+    dividerLine: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: c.border,
+    },
+    dividerText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.lightText,
+      fontWeight: WEIGHT.semibold,
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+    },
+    btnGuest: {
+      height: 52,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+      backgroundColor: c.surface,
     },
     btnGuestText: {
       fontFamily: FONT_FAMILY,
-      fontSize: TYPE.caption,
+      fontSize: TYPE.bodySmall,
       color: c.lightText,
+      fontWeight: WEIGHT.semibold,
+      letterSpacing: 0.1,
+    },
+    guestNote: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.lightText,
+      textAlign: 'center',
+      opacity: 0.7,
       letterSpacing: 0.2,
-      textDecorationLine: 'underline',
     },
     guestError: {
       fontFamily: FONT_FAMILY,
