@@ -21,6 +21,7 @@ import Button from '../components/Button';
 import TextField from '../components/TextField';
 import Card from '../components/Card';
 import SelectSheet, { SelectOption } from '../components/SelectSheet';
+import IconButton from '../components/IconButton';
 
 const ZONE_MESSAGES = [
   'Loading your sub-counties…',
@@ -103,7 +104,7 @@ const ZoneLoader = () => {
 const ProfileSetupScreen = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { user, userData, updateUserData } = useAuth();
+  const { user, userData, updateUserData, logout } = useAuth();
   const isGuest = !!userData?.isGuest;
   const [name, setName] = useState(userData?.name || user?.email?.split('@')[0] || '');
   const [zones, setZones] = useState<Array<{ sub_county: string; soil_type: string }>>([]);
@@ -176,6 +177,15 @@ const ProfileSetupScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.bgAccent} />
+        <View style={styles.topBar}>
+          <IconButton
+            icon="arrow-left"
+            variant="soft"
+            size="md"
+            onPress={logout}
+            accessibilityLabel="Go back"
+          />
+        </View>
         <ZoneLoader />
       </SafeAreaView>
     );
@@ -184,6 +194,15 @@ const ProfileSetupScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
+      <View style={styles.topBar}>
+        <IconButton
+          icon="arrow-left"
+          variant="soft"
+          size="md"
+          onPress={logout}
+          accessibilityLabel="Go back"
+        />
+      </View>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -291,6 +310,7 @@ const ProfileSetupScreen = () => {
 const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
+    topBar: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm },
     content: { flexGrow: 1, padding: SPACING.xl },
     innerContent: { marginVertical: 'auto' },
     header: { alignItems: 'center', marginBottom: SPACING.lg },
