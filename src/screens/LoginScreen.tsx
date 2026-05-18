@@ -21,6 +21,7 @@ import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
 import { useAuth } from '../context/AuthContext';
+import IconButton from '../components/IconButton';
 
 const LoginScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
@@ -66,6 +67,15 @@ const LoginScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.root}>
+      <View style={styles.topBar}>
+        <IconButton
+          icon="arrow-left"
+          variant="soft"
+          size="md"
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+        />
+      </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -180,6 +190,7 @@ const LoginScreen = ({ navigation }: any) => {
 const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: c.background },
+    topBar: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm },
     flex: { flex: 1 },
     scroll: {
       flexGrow: 1,
