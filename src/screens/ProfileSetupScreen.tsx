@@ -309,11 +309,11 @@ const ProfileSetupScreen = () => {
 
 const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.background },
+    container: { flex: 1, backgroundColor: c.background, overflow: 'hidden' },
     topBar: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm },
-    content: { flexGrow: 1, padding: SPACING.xl, justifyContent: 'center' },
+    content: { flexGrow: 1, paddingHorizontal: SPACING.xl, paddingTop: SPACING.lg, paddingBottom: SPACING.xl },
     innerContent: {},
-    header: { alignItems: 'center', marginBottom: SPACING.lg },
+    header: { alignItems: 'center', marginBottom: SPACING.md },
     headerIcon: {
       width: 60,
       height: 60,
@@ -443,13 +443,13 @@ const createStyles = (c: ThemeColors) =>
     submitBtn: { marginTop: SPACING.xs },
     bgAccent: {
       position: 'absolute',
-      width: 280,
-      height: 280,
-      borderRadius: 140,
+      width: 200,
+      height: 200,
+      borderRadius: 100,
       backgroundColor: c.iconBg,
-      right: -90,
-      top: -90,
-      opacity: 0.6,
+      right: -60,
+      top: -60,
+      opacity: 0.5,
     },
   });
 
