@@ -134,9 +134,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await setDoc(doc(db, 'users', cred.user.uid), {
         name: 'Guest',
         region: 'Luwero',
-        subCounty: 'Bamunanika',
-        soilType: 'Sandy Loam',
-        profileComplete: true,
+        subCounty: '',
+        soilType: '',
+        profileComplete: false,
         isGuest: true,
       });
     } catch (e) {

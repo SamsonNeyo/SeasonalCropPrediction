@@ -104,6 +104,7 @@ const ProfileSetupScreen = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, userData, updateUserData } = useAuth();
+  const isGuest = !!userData?.isGuest;
   const [name, setName] = useState(userData?.name || user?.email?.split('@')[0] || '');
   const [zones, setZones] = useState<Array<{ sub_county: string; soil_type: string }>>([]);
   const [subCounty, setSubCounty] = useState('');
@@ -137,7 +138,7 @@ const ProfileSetupScreen = () => {
 
   const handleContinue = async () => {
     try {
-      if (!name.trim()) {
+      if (!isGuest && !name.trim()) {
         setError('Name is required.');
         return;
       }
@@ -191,23 +192,33 @@ const ProfileSetupScreen = () => {
         <View style={styles.innerContent}>
         <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <MaterialCommunityIcons name="account-cog-outline" size={26} color={colors.primary} />
+            <MaterialCommunityIcons
+              name={isGuest ? 'map-marker-outline' : 'account-cog-outline'}
+              size={26}
+              color={colors.primary}
+            />
           </View>
-          <Text style={styles.title}>Complete your profile</Text>
+          <Text style={styles.title}>
+            {isGuest ? 'Choose your location' : 'Complete your profile'}
+          </Text>
           <Text style={styles.subtitle}>
-            Set your sub-county to unlock accurate, location-aware recommendations.
+            {isGuest
+              ? 'Select your sub-county to get accurate crop predictions for your area.'
+              : 'Set your sub-county to unlock accurate, location-aware recommendations.'}
           </Text>
         </View>
 
         <Card variant="glass" padding="lg" emphasis="md" style={styles.card}>
-          <TextField
-            label="Your name"
-            placeholder="Full name"
-            value={name}
-            onChangeText={setName}
-            leftIcon={<MaterialCommunityIcons name="account-outline" size={18} color={colors.lightText} />}
-            accessibilityLabel="Your name"
-          />
+          {!isGuest && (
+            <TextField
+              label="Your name"
+              placeholder="Full name"
+              value={name}
+              onChangeText={setName}
+              leftIcon={<MaterialCommunityIcons name="account-outline" size={18} color={colors.lightText} />}
+              accessibilityLabel="Your name"
+            />
+          )}
 
           <Text style={styles.fieldLabel}>Sub-county</Text>
           <TouchableOpacity
@@ -249,7 +260,7 @@ const ProfileSetupScreen = () => {
             label="Continue"
             onPress={handleContinue}
             loading={saving}
-            disabled={!name.trim() || !subCounty}
+            disabled={(!isGuest && !name.trim()) || !subCounty}
             fullWidth
             size="lg"
             style={styles.submitBtn}
