@@ -93,52 +93,53 @@ const WelcomeScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.root}>
+      {/* ── Hero (fixed, never scrolls) ── */}
+      <View style={styles.hero}>
+        <Animated.View
+          style={[
+            styles.heroContent,
+            {
+              opacity: heroAnim,
+              transform: [{
+                translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
+              }],
+            },
+          ]}
+        >
+          {/* Logo */}
+          <View style={styles.logoRing}>
+            <Image
+              source={require('../../assets/splash-icon.png')}
+              style={styles.logo}
+              resizeMode="cover"
+            />
+          </View>
+
+          {/* Brand */}
+          <Text style={styles.appName}>SmartCrop</Text>
+          <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
+
+          {/* Trust badges */}
+          <View style={styles.badgeRow}>
+            <View style={styles.badge}>
+              <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
+              <Text style={styles.badgeText}>Luwero District</Text>
+            </View>
+            <View style={styles.badge}>
+              <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
+              <Text style={styles.badgeText}>Free to use</Text>
+            </View>
+          </View>
+        </Animated.View>
+      </View>
+
+      {/* ── Content card (scrolls independently) ── */}
       <ScrollView
+        style={styles.cardScroll}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* ── Hero ── */}
-        <View style={styles.hero}>
-          <Animated.View
-            style={[
-              styles.heroContent,
-              {
-                opacity: heroAnim,
-                transform: [{
-                  translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
-                }],
-              },
-            ]}
-          >
-            {/* Logo */}
-            <View style={styles.logoRing}>
-              <Image
-                source={require('../../assets/splash-icon.png')}
-                style={styles.logo}
-                resizeMode="cover"
-              />
-            </View>
-
-            {/* Brand */}
-            <Text style={styles.appName}>SmartCrop</Text>
-            <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
-
-            {/* Trust badges */}
-            <View style={styles.badgeRow}>
-              <View style={styles.badge}>
-                <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
-                <Text style={styles.badgeText}>Luwero District</Text>
-              </View>
-              <View style={styles.badge}>
-                <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
-                <Text style={styles.badgeText}>Free to use</Text>
-              </View>
-            </View>
-          </Animated.View>
-        </View>
-
-        {/* ── Content card ── */}
         <Animated.View
           style={[
             styles.card,
@@ -237,6 +238,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
 
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: c.primary },
+    cardScroll: { flex: 1 },
     scroll: { flexGrow: 1 },
 
     // ── Hero ──
@@ -308,10 +310,10 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
       marginTop: -28,
-      flex: 1,
       paddingHorizontal: SPACING.xl,
       paddingTop: SPACING.xl + 4,
       paddingBottom: SPACING.xxl,
+      minHeight: '100%',
       maxWidth: Platform.OS === 'web' ? 500 : undefined,
       alignSelf: Platform.OS === 'web' ? 'center' : undefined,
       width: '100%',

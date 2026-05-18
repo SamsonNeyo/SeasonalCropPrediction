@@ -311,8 +311,8 @@ const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     topBar: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm },
-    content: { flexGrow: 1, padding: SPACING.xl },
-    innerContent: { marginVertical: 'auto' },
+    content: { flexGrow: 1, padding: SPACING.xl, justifyContent: 'center' },
+    innerContent: {},
     header: { alignItems: 'center', marginBottom: SPACING.lg },
     headerIcon: {
       width: 60,
