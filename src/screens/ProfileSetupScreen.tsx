@@ -105,7 +105,7 @@ const ProfileSetupScreen = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, userData, updateUserData, logout } = useAuth();
-  const isGuest = !!userData?.isGuest;
+  const isGuest = !!userData?.isGuest || !!user?.isAnonymous;
   const [name, setName] = useState(userData?.name || user?.email?.split('@')[0] || '');
   const [zones, setZones] = useState<Array<{ sub_county: string; soil_type: string }>>([]);
   const [subCounty, setSubCounty] = useState('');
