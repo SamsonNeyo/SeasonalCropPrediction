@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Platform,
   Animated,
   Easing,
+  ActivityIndicator,
   ScrollView,
   Pressable,
 } from 'react-native';
@@ -51,6 +52,20 @@ const WelcomeScreen = ({ navigation }: any) => {
   const { colors, isDark } = useTheme();
   const { continueAsGuest } = useAuth();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestError, setGuestError] = useState('');
+
+  const handleGuest = async () => {
+    try {
+      setGuestError('');
+      setGuestLoading(true);
+      await continueAsGuest();
+    } catch (e: any) {
+      setGuestError(e?.message || 'Could not continue as guest. Please try again.');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const heroAnim = useRef(new Animated.Value(0)).current;
   const cardAnim = useRef(new Animated.Value(0)).current;
@@ -191,13 +206,21 @@ const WelcomeScreen = ({ navigation }: any) => {
               </Text>
             </Pressable>
 
+            {!!guestError && (
+              <Text style={styles.guestError}>{guestError}</Text>
+            )}
+
             <Pressable
               style={({ pressed }) => [styles.btnGuest, pressed && { opacity: 0.6 }]}
-              onPress={continueAsGuest}
+              onPress={handleGuest}
+              disabled={guestLoading}
               accessibilityRole="button"
               accessibilityLabel="Continue without signing in"
             >
-              <Text style={styles.btnGuestText}>Continue without signing in</Text>
+              {guestLoading
+                ? <ActivityIndicator size="small" color={colors.lightText} />
+                : <Text style={styles.btnGuestText}>Continue without signing in</Text>
+              }
             </Pressable>
           </Animated.View>
         </Animated.View>
@@ -396,6 +419,13 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       color: c.lightText,
       letterSpacing: 0.2,
       textDecorationLine: 'underline',
+    },
+    guestError: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.error,
+      textAlign: 'center',
+      marginBottom: SPACING.xs,
     },
   });
 };
