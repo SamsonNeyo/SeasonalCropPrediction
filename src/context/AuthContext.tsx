@@ -3,6 +3,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously,
   signOut,
   sendPasswordResetEmail,
   reload,
@@ -26,6 +27,7 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
+  continueAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserData: (data: Record<string, any>) => Promise<void>;
@@ -126,6 +128,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const continueAsGuest = async () => {
+    try {
+      const cred = await signInAnonymously(auth);
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        name: 'Guest',
+        region: 'Luwero',
+        subCounty: 'Bamunanika',
+        soilType: 'Sandy Loam',
+        profileComplete: true,
+        isGuest: true,
+      });
+    } catch (e) {
+      throw new Error(getAuthErrorMessage(e));
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -167,6 +185,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loading,
         login,
         signup,
+        continueAsGuest,
         logout,
         resetPassword,
         updateUserData,

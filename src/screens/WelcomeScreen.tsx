@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
@@ -48,6 +49,7 @@ const FEATURES: Feature[] = [
 
 const WelcomeScreen = ({ navigation }: any) => {
   const { colors, isDark } = useTheme();
+  const { continueAsGuest } = useAuth();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const heroAnim = useRef(new Animated.Value(0)).current;
@@ -187,6 +189,15 @@ const WelcomeScreen = ({ navigation }: any) => {
                 Already have an account?{'  '}
                 <Text style={styles.btnSecondaryAccent}>Sign in</Text>
               </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.btnGuest, pressed && { opacity: 0.6 }]}
+              onPress={continueAsGuest}
+              accessibilityRole="button"
+              accessibilityLabel="Continue without signing in"
+            >
+              <Text style={styles.btnGuestText}>Continue without signing in</Text>
             </Pressable>
           </Animated.View>
         </Animated.View>
@@ -374,6 +385,17 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     btnSecondaryAccent: {
       color: c.primary,
       fontWeight: WEIGHT.bold,
+    },
+    btnGuest: {
+      alignItems: 'center',
+      paddingVertical: SPACING.sm,
+    },
+    btnGuestText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: c.lightText,
+      letterSpacing: 0.2,
+      textDecorationLine: 'underline',
     },
   });
 };
