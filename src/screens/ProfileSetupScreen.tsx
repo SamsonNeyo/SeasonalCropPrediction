@@ -351,14 +351,6 @@ const createStyles = (c: ThemeColors) =>
       color: c.lightText,
       letterSpacing: 0.2,
     },
-    skelGroup: { marginBottom: SPACING.md },
-    loadingHintText: {
-      fontFamily: FONT_FAMILY,
-      fontSize: TYPE.caption,
-      color: c.lightText,
-      marginTop: SPACING.sm,
-      textAlign: 'center',
-    },
     selectField: {
       borderWidth: 1,
       borderColor: c.glassBorder,

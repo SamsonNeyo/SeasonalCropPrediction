@@ -47,7 +47,7 @@ const getCurrentSeason = () => {
 
 const ProfileScreen = () => {
   const { colors, isDark, setDarkMode } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, userData, logout, updateUserData } = useAuth();
   const toast = useToast();
   const [editMode, setEditMode] = useState(false);
@@ -723,7 +723,7 @@ const settingRowStyles = (c: ThemeColors, isLast: boolean) =>
     },
   });
 
-const createStyles = (c: ThemeColors, _isDark: boolean) =>
+const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     flex: { flex: 1 },

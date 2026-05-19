@@ -303,12 +303,6 @@ const HomeScreen = () => {
               </View>
 
               <View style={styles.weatherMetricsRow}>
-                {weather?.humidity != null && (
-                  <WeatherMetric icon="water-outline" value={`${weather.humidity}%`} label="Humidity" isDark={isDark} />
-                )}
-                {weather?.wind != null && (
-                  <WeatherMetric icon="speedometer-outline" value={`${weather.wind}`} label="Wind" isDark={isDark} />
-                )}
                 <WeatherMetric icon="calendar-outline" value={seasonValue} label="Season" isDark={isDark} />
               </View>
             </View>

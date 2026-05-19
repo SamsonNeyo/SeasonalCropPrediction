@@ -295,9 +295,7 @@ const ManualAnalysisScreen = () => {
             </View>
 
             {/* Featured */}
-            <View style={styles.featuredWrap}>
-              <PredictionCard prediction={topRec} variant="featured" />
-            </View>
+            <PredictionCard prediction={topRec} variant="featured" />
 
             {/* Compact list */}
             {restRecs.length > 0 && (
@@ -542,7 +540,6 @@ const createStyles = (c: ThemeColors) =>
 
     // Results
     statRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
-    featuredWrap: {},
     subSectionRow: { marginTop: SPACING.sm, marginBottom: SPACING.sm + 2 },
     subSectionLabel: {
       fontFamily: FONT_FAMILY,

@@ -12,8 +12,8 @@ type SkeletonProps = {
 };
 
 const Skeleton = ({ width = '100%', height = 14, borderRadius = RADIUS.sm, style }: SkeletonProps) => {
-  const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export const SkeletonGroup = ({ children, style }: { children: React.ReactNode; 
   return <View style={[{ gap: 10 }, style]}>{children}</View>;
 };
 
-const createStyles = (c: ThemeColors, _isDark: boolean) =>
+const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
     wrap: {
       backgroundColor: c.glassSoft,

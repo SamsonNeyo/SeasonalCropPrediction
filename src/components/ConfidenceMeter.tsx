@@ -114,7 +114,6 @@ const createStyles = (c: ThemeColors, size: 'sm' | 'md') => {
       height: '100%',
       borderRadius: RADIUS.pill,
     },
-    _unused: { padding: SPACING.none },
   });
 };
 
