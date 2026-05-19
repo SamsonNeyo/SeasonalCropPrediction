@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -51,6 +52,8 @@ const FEATURES: Feature[] = [
 const WelcomeScreen = ({ navigation }: any) => {
   const { colors, isDark } = useTheme();
   const { continueAsGuest } = useAuth();
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width >= 768;
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [guestLoading, setGuestLoading] = useState(false);
   const [guestError, setGuestError] = useState('');
@@ -91,157 +94,167 @@ const WelcomeScreen = ({ navigation }: any) => {
     ]).start();
   }, [heroAnim, cardAnim, btnAnim]);
 
-  return (
-    <SafeAreaView style={styles.root}>
-      {/* ── Hero (fixed, never scrolls) ── */}
-      <View style={styles.hero}>
-        <Animated.View
-          style={[
-            styles.heroContent,
-            {
-              opacity: heroAnim,
-              transform: [{
-                translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
-              }],
-            },
-          ]}
-        >
-          {/* Logo */}
-          <View style={styles.logoRing}>
-            <Image
-              source={require('../../assets/splash-icon.png')}
-              style={styles.logo}
-              resizeMode="cover"
-            />
+  const heroNode = (
+    <View style={[styles.hero, isDesktopWeb && styles.heroFlush]}>
+      <Animated.View
+        style={[
+          styles.heroContent,
+          {
+            opacity: heroAnim,
+            transform: [{
+              translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
+            }],
+          },
+        ]}
+      >
+        <View style={styles.logoRing}>
+          <Image
+            source={require('../../assets/splash-icon.png')}
+            style={styles.logo}
+            resizeMode="cover"
+          />
+        </View>
+        <Text style={styles.appName}>SmartCrop</Text>
+        <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
+        <View style={styles.badgeRow}>
+          <View style={styles.badge}>
+            <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
+            <Text style={styles.badgeText}>Luwero District</Text>
           </View>
-
-          {/* Brand */}
-          <Text style={styles.appName}>SmartCrop</Text>
-          <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
-
-          {/* Trust badges */}
-          <View style={styles.badgeRow}>
-            <View style={styles.badge}>
-              <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
-              <Text style={styles.badgeText}>Luwero District</Text>
-            </View>
-            <View style={styles.badge}>
-              <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
-              <Text style={styles.badgeText}>Free to use</Text>
-            </View>
+          <View style={styles.badge}>
+            <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
+            <Text style={styles.badgeText}>Free to use</Text>
           </View>
-        </Animated.View>
+        </View>
+      </Animated.View>
+    </View>
+  );
+
+  const cardNode = (
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          opacity: cardAnim,
+          transform: [{
+            translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }),
+          }],
+        },
+      ]}
+    >
+      <View style={styles.sectionLabelRow}>
+        <View style={styles.sectionDot} />
+        <Text style={styles.sectionLabel}>What you get</Text>
+        <View style={styles.sectionLine} />
       </View>
 
-      {/* ── Content card (scrolls independently) ── */}
-      <ScrollView
-        style={styles.cardScroll}
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        <Animated.View
-          style={[
-            styles.card,
-            {
-              opacity: cardAnim,
-              transform: [{
-                translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }),
-              }],
-            },
-          ]}
-        >
-          {/* What you get label */}
-          <View style={styles.sectionLabelRow}>
-            <View style={styles.sectionDot} />
-            <Text style={styles.sectionLabel}>What you get</Text>
-            <View style={styles.sectionLine} />
-          </View>
-
-          {/* Features */}
-          <View style={styles.features}>
-            {FEATURES.map((f) => (
-              <View key={f.title} style={styles.featureRow}>
-                <View style={styles.featureIcon}>
-                  <MaterialCommunityIcons name={f.icon} size={20} color={colors.primary} />
-                </View>
-                <View style={styles.featureText}>
-                  <Text style={styles.featureTitle}>{f.title}</Text>
-                  <Text style={styles.featureBody}>{f.body}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* Actions */}
-          <Animated.View
-            style={[
-              styles.actions,
-              {
-                opacity: btnAnim,
-                transform: [{
-                  translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
-                }],
-              },
-            ]}
-          >
-            <Pressable
-              style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
-              onPress={() => navigation.navigate('Signup')}
-              accessibilityRole="button"
-              accessibilityLabel="Get started"
-            >
-              <Text style={styles.btnPrimaryText}>Get Started</Text>
-              <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
-              onPress={() => navigation.navigate('Login')}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in"
-            >
-              <Text style={styles.btnSecondaryText}>
-                Already have an account?{'  '}
-                <Text style={styles.btnSecondaryAccent}>Sign in</Text>
-              </Text>
-            </Pressable>
-
-            {/* ── Divider ── */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
+      <View style={styles.features}>
+        {FEATURES.map((f) => (
+          <View key={f.title} style={styles.featureRow}>
+            <View style={styles.featureIcon}>
+              <MaterialCommunityIcons name={f.icon} size={20} color={colors.primary} />
             </View>
+            <View style={styles.featureText}>
+              <Text style={styles.featureTitle}>{f.title}</Text>
+              <Text style={styles.featureBody}>{f.body}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
 
-            {!!guestError && (
-              <Text style={styles.guestError}>{guestError}</Text>
-            )}
+      <Animated.View
+        style={[
+          styles.actions,
+          {
+            opacity: btnAnim,
+            transform: [{
+              translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+            }],
+          },
+        ]}
+      >
+        <Pressable
+          style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.88 }]}
+          onPress={() => navigation.navigate('Signup')}
+          accessibilityRole="button"
+          accessibilityLabel="Get started"
+        >
+          <Text style={styles.btnPrimaryText}>Get Started</Text>
+          <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
+        </Pressable>
 
-            {/* ── Guest button ── */}
-            <Pressable
-              style={({ pressed }) => [styles.btnGuest, pressed && { opacity: 0.75 }]}
-              onPress={handleGuest}
-              disabled={guestLoading}
-              accessibilityRole="button"
-              accessibilityLabel="Continue without signing in"
-            >
-              {guestLoading ? (
-                <ActivityIndicator size="small" color={colors.lightText} />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="account-outline" size={18} color={colors.lightText} />
-                  <Text style={styles.btnGuestText}>Continue without signing in</Text>
-                </>
-              )}
-            </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
+          onPress={() => navigation.navigate('Login')}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in"
+        >
+          <Text style={styles.btnSecondaryText}>
+            Already have an account?{'  '}
+            <Text style={styles.btnSecondaryAccent}>Sign in</Text>
+          </Text>
+        </Pressable>
 
-            <Text style={styles.guestNote}>
-              No account needed · Some features may be limited
-            </Text>
-          </Animated.View>
-        </Animated.View>
-      </ScrollView>
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {!!guestError && (
+          <Text style={styles.guestError}>{guestError}</Text>
+        )}
+
+        <Pressable
+          style={({ pressed }) => [styles.btnGuest, pressed && { opacity: 0.75 }]}
+          onPress={handleGuest}
+          disabled={guestLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Continue without signing in"
+        >
+          {guestLoading ? (
+            <ActivityIndicator size="small" color={colors.lightText} />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="account-outline" size={18} color={colors.lightText} />
+              <Text style={styles.btnGuestText}>Continue without signing in</Text>
+            </>
+          )}
+        </Pressable>
+
+        <Text style={styles.guestNote}>
+          No account needed · Some features may be limited
+        </Text>
+      </Animated.View>
+    </Animated.View>
+  );
+
+  return (
+    <SafeAreaView style={styles.root}>
+      {isDesktopWeb ? (
+        // Desktop web: hero + card scroll together as one page
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {heroNode}
+          {cardNode}
+        </ScrollView>
+      ) : (
+        // Mobile (native or mobile web): hero fixed, only card scrolls
+        <>
+          {heroNode}
+          <ScrollView
+            style={styles.cardScroll}
+            contentContainerStyle={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {cardNode}
+          </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   );
 };
@@ -254,8 +267,11 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
 
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: c.primary },
+    // Mobile: card-only scroll
     cardScroll: { flex: 1 },
     scroll: { flexGrow: 1 },
+    // Desktop web: full-page scroll
+    scrollContent: { flexGrow: 1 },
 
     // ── Hero ──
     hero: {
@@ -265,6 +281,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       paddingHorizontal: SPACING.xxl,
       alignItems: 'center',
     },
+    heroFlush: { paddingBottom: 0 },
     heroContent: { alignItems: 'center', width: '100%' },
 
     logoRing: {
