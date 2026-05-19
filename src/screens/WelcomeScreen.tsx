@@ -93,53 +93,51 @@ const WelcomeScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.root}>
-      {/* ── Hero (fixed, never scrolls) ── */}
-      <View style={styles.hero}>
-        <Animated.View
-          style={[
-            styles.heroContent,
-            {
-              opacity: heroAnim,
-              transform: [{
-                translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
-              }],
-            },
-          ]}
-        >
-          {/* Logo */}
-          <View style={styles.logoRing}>
-            <Image
-              source={require('../../assets/splash-icon.png')}
-              style={styles.logo}
-              resizeMode="cover"
-            />
-          </View>
-
-          {/* Brand */}
-          <Text style={styles.appName}>SmartCrop</Text>
-          <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
-
-          {/* Trust badges */}
-          <View style={styles.badgeRow}>
-            <View style={styles.badge}>
-              <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
-              <Text style={styles.badgeText}>Luwero District</Text>
-            </View>
-            <View style={styles.badge}>
-              <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
-              <Text style={styles.badgeText}>Free to use</Text>
-            </View>
-          </View>
-        </Animated.View>
-      </View>
-
-      {/* ── Content card (scrolls independently) ── */}
+      {/* ── Single scrollable area — hero + card scroll together ── */}
       <ScrollView
-        style={styles.cardScroll}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
+        <View style={styles.hero}>
+          <Animated.View
+            style={[
+              styles.heroContent,
+              {
+                opacity: heroAnim,
+                transform: [{
+                  translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }),
+                }],
+              },
+            ]}
+          >
+            {/* Logo */}
+            <View style={styles.logoRing}>
+              <Image
+                source={require('../../assets/splash-icon.png')}
+                style={styles.logo}
+                resizeMode="cover"
+              />
+            </View>
+
+            {/* Brand */}
+            <Text style={styles.appName}>SmartCrop</Text>
+            <Text style={styles.tagline}>Your AI-powered farm advisor</Text>
+
+            {/* Trust badges */}
+            <View style={styles.badgeRow}>
+              <View style={styles.badge}>
+                <MaterialCommunityIcons name="map-marker-outline" size={12} color={styles.badgeText.color} />
+                <Text style={styles.badgeText}>Luwero District</Text>
+              </View>
+              <View style={styles.badge}>
+                <MaterialCommunityIcons name="shield-check-outline" size={12} color={styles.badgeText.color} />
+                <Text style={styles.badgeText}>Free to use</Text>
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+
         <Animated.View
           style={[
             styles.card,
@@ -241,6 +239,7 @@ const WelcomeScreen = ({ navigation }: any) => {
             </Text>
           </Animated.View>
         </Animated.View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -254,14 +253,13 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
 
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: c.primary },
-    cardScroll: { flex: 1 },
-    scroll: { flexGrow: 1 },
+    scrollContent: { flexGrow: 1 },
 
     // ── Hero ──
     hero: {
       backgroundColor: c.primary,
       paddingTop: SPACING.xl,
-      paddingBottom: SPACING.xl,
+      paddingBottom: 0,
       paddingHorizontal: SPACING.xxl,
       alignItems: 'center',
     },
