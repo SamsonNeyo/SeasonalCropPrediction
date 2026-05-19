@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
@@ -78,7 +77,7 @@ const SplashScreen = () => {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.bgOrbOne} />
       <View style={styles.bgOrbTwo} />
       <Animated.View style={[styles.content, { opacity: fadeIn, transform: [{ translateY: rise }] }]}>
@@ -92,7 +91,7 @@ const SplashScreen = () => {
           <Animated.View style={[styles.progressBar, { width: progressWidth }]} />
         </View>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -102,6 +101,7 @@ const createStyles = (c: ThemeColors) =>
       flex: 1,
       backgroundColor: c.background,
       justifyContent: 'center',
+      alignItems: 'center',
     },
     content: { alignItems: 'center', paddingHorizontal: SPACING.xxl },
     logo: { width: 96, height: 96, marginBottom: SPACING.xl },
