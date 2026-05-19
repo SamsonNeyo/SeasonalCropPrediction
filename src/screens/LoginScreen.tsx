@@ -70,7 +70,7 @@ const LoginScreen = ({ navigation }: any) => {
       <View style={styles.topBar}>
         <IconButton
           icon="arrow-left"
-          variant="soft"
+          variant="plain"
           size="md"
           onPress={() => navigation.goBack()}
           accessibilityLabel="Go back"

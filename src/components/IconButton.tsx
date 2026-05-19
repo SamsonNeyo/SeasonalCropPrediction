@@ -1,12 +1,12 @@
 import React, { useMemo, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, ViewStyle } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/colors';
 import { RADIUS } from '../constants/spacing';
 import { elevation } from '../constants/elevation';
 
-export type IconButtonVariant = 'soft' | 'solid' | 'ghost' | 'danger';
+export type IconButtonVariant = 'soft' | 'solid' | 'ghost' | 'danger' | 'plain';
 export type IconButtonSize = 'sm' | 'md' | 'lg';
 
 type IconButtonProps = {
@@ -44,11 +44,11 @@ const IconButton = ({
   const dims = SIZE_MAP[size];
 
   const handlePressIn = () => {
-    if (disabled) return;
+    if (disabled || Platform.OS === 'web') return;
     Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 60, bounciness: 0 }).start();
   };
   const handlePressOut = () => {
-    if (disabled) return;
+    if (disabled || Platform.OS === 'web') return;
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 60, bounciness: 4 }).start();
   };
 
@@ -87,6 +87,8 @@ const createStyles = (c: ThemeColors, variant: IconButtonVariant) => {
         return { bg: 'transparent', border: 'transparent', icon: c.secondary, shadow: 'none' as const };
       case 'danger':
         return { bg: `${c.error}15`, border: `${c.error}40`, icon: c.error, shadow: 'none' as const };
+      case 'plain':
+        return { bg: 'transparent', border: 'transparent', icon: c.text, shadow: 'none' as const };
       case 'soft':
       default:
         return { bg: c.card, border: c.border, icon: c.primary, shadow: 'sm' as const };
@@ -96,7 +98,7 @@ const createStyles = (c: ThemeColors, variant: IconButtonVariant) => {
   return StyleSheet.create({
     base: {
       borderRadius: RADIUS.md,
-      borderWidth: 1,
+      borderWidth: variant === 'plain' || variant === 'ghost' ? 0 : 1,
       backgroundColor: palette.bg,
       borderColor: palette.border,
       alignItems: 'center',
