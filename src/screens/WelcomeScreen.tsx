@@ -343,7 +343,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
       paddingHorizontal: SPACING.xl,
-      paddingTop: SPACING.xl + 4,
+      paddingTop: SPACING.xxxl,
       paddingBottom: SPACING.xxl,
       flexGrow: 1,
       maxWidth: Platform.OS === 'web' ? 500 : undefined,
