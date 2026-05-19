@@ -58,10 +58,21 @@ def _load_results(path: Path):
     return SARIMAXResults.load(str(path))
 
 
+_yield_results: Any = None
+_price_results: Any = None
+
+
+def _get_models():
+    global _yield_results, _price_results
+    if _yield_results is None:
+        _yield_results = _load_results(YIELD_MODEL_PATH)
+    if _price_results is None:
+        _price_results = _load_results(PRICE_MODEL_PATH)
+    return _yield_results, _price_results
+
+
 def build_forecast(steps: int = 6) -> dict[str, Any]:
-    ensure_models()
-    yield_results = _load_results(YIELD_MODEL_PATH)
-    price_results = _load_results(PRICE_MODEL_PATH)
+    yield_results, price_results = _get_models()
     yield_pred = yield_results.get_forecast(steps=steps).predicted_mean
     price_pred = price_results.get_forecast(steps=steps).predicted_mean
     future_dates = pd.date_range(start=pd.Timestamp.today().replace(day=1), periods=steps, freq="MS")

@@ -119,8 +119,10 @@ export const predictBySubCounty = async (data: { sub_county: string; season?: st
   return res.data;
 };
 
-// Fire-and-forget: wake Render free-tier from cold sleep and pre-cache soil zones
-// so ProfileSetup and ManualAnalysis feel instant when the user reaches them.
+// Fire immediately at module load — wakes the Render free-tier during JS bundle
+// execution, before Firebase auth even resolves, so the first real API call is fast.
+getSoilZones().catch(() => {});
+
 export const warmupBackend = () => {
   getSoilZones().catch(() => {});
 };
