@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -58,12 +58,12 @@ const Button = ({
   const scale = useRef(new Animated.Value(1)).current;
   const isDisabled = disabled || loading;
 
-  const handlePressIn = () => {
+  const handlePressIn = useCallback(() => {
     Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 60, bounciness: 0 }).start();
-  };
-  const handlePressOut = () => {
+  }, [scale]);
+  const handlePressOut = useCallback(() => {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 60, bounciness: 4 }).start();
-  };
+  }, [scale]);
 
   const variantStyle = styles[`v_${variant}` as const] as ViewStyle;
   const variantDisabledStyle = styles[`v_${variant}_disabled` as const] as ViewStyle;

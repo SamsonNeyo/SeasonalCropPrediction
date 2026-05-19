@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -191,7 +191,7 @@ const AIAdvisorScreen = () => {
       text: `How can a smallholder farmer in ${subCounty} reduce input costs this ${season.toLowerCase()} season?` },
   ], [season, subCounty, soilType]);
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = useCallback(async (text: string) => {
     const q = text.trim();
     if (!q || isLoading) return;
 
@@ -236,15 +236,15 @@ const AIAdvisorScreen = () => {
         ),
       );
     }
-  };
+  }, [subCounty, soilType, season, isLoading]);
 
-  const handleRetry = (question: string) => {
+  const handleRetry = useCallback((question: string) => {
     setMessages(prev => {
       const idx = [...prev].reverse().findIndex(m => m.role === 'ai' && m.error);
       return idx === -1 ? prev : prev.slice(0, prev.length - 1 - idx);
     });
     sendMessage(question);
-  };
+  }, [sendMessage]);
 
   return (
     <SafeAreaView style={styles.container}>

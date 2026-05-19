@@ -98,10 +98,10 @@ const MainTabs = () => {
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="AI" component={AIAdvisorScreen} options={{ title: 'AI Advisor' }} />
-      <Tab.Screen name="Manual" component={ManualAnalysisScreen} options={{ title: 'Manual' }} />
-      <Tab.Screen name="History" component={HistoryScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="AI" component={AIAdvisorScreen} options={{ title: 'AI Advisor', lazy: true }} />
+      <Tab.Screen name="Manual" component={ManualAnalysisScreen} options={{ title: 'Manual', lazy: true }} />
+      <Tab.Screen name="History" component={HistoryScreen} options={{ lazy: true }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ lazy: true }} />
     </Tab.Navigator>
   );
 };

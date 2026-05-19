@@ -126,7 +126,7 @@ const HistoryScreen = () => {
 
   useEffect(() => {
     loadHistory();
-    Animated.stagger(140, [
+    const anim = Animated.stagger(140, [
       Animated.timing(headerIn, {
         toValue: 1,
         duration: 600,
@@ -139,8 +139,10 @@ const HistoryScreen = () => {
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-    ]).start();
-  }, [user, headerIn, listIn]);
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [user]); // animated refs are stable — excluded from deps
 
   const getItemDate = (item: any): Date | null => {
     const ts = item?.createdAt ?? item?.timestamp;

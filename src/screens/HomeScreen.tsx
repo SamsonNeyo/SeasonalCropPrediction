@@ -205,16 +205,16 @@ const HomeScreen = () => {
       Animated.timing(statsIn, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(listIn, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
-  }, [fetchSeasonalRecommendations, loadCachedHome, headerIn, heroIn, statsIn, listIn]);
+  }, [fetchSeasonalRecommendations, loadCachedHome]); // animated refs are stable — excluded from deps
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       await fetchSeasonalRecommendations();
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [fetchSeasonalRecommendations]);
 
   if (loading && recommendations.length === 0) {
     return (
@@ -249,7 +249,7 @@ const HomeScreen = () => {
         >
           <View style={styles.avatarSmall}>
             {userPhoto ? (
-              <Image source={{ uri: userPhoto }} style={styles.avatarImg} />
+              <Image source={{ uri: userPhoto }} style={styles.avatarImg} resizeMode="cover" />
             ) : (
               <MaterialCommunityIcons name="account" size={20} color={colors.primary} />
             )}
@@ -478,7 +478,7 @@ const HomeScreen = () => {
   );
 };
 
-const WeatherMetric = ({
+const WeatherMetric = React.memo(({
   icon,
   value,
   label,
@@ -517,9 +517,9 @@ const WeatherMetric = ({
       </Text>
     </View>
   );
-};
+});
 
-const SeasonBlock = ({
+const SeasonBlock = React.memo(({
   icon,
   label,
   value,
@@ -584,7 +584,7 @@ const SeasonBlock = ({
       </Text>
     </View>
   );
-};
+});
 
 const PredictionLoader = () => {
   const { colors, isDark } = useTheme();
@@ -608,14 +608,18 @@ const PredictionLoader = () => {
       });
     }, 3200);
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.08, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
-    return () => clearInterval(cycle);
+    return () => {
+      clearInterval(cycle);
+      pulseLoop.stop();
+    };
   }, [fadeAnim, pulseAnim]);
 
   return (
