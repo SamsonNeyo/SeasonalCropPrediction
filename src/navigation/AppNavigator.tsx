@@ -22,7 +22,6 @@ import AIAdvisorScreen from '../screens/AIAdvisorScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProfileSetupScreen from '../screens/ProfileSetupScreen';
-import OnboardingScreen from '../screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -131,7 +130,6 @@ const AppNavigator = () => {
     if (typeof userData.profileComplete === 'boolean') return userData.profileComplete;
     return !!String(userData.subCounty || '').trim();
   })();
-  const isOnboardingComplete = !!userData?.onboardingComplete;
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -177,8 +175,6 @@ const AppNavigator = () => {
           </>
         ) : !isProfileComplete ? (
           <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-        ) : !isOnboardingComplete ? (
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         ) : (
           <Stack.Screen name="Main" component={MainTabs} />
         )}
