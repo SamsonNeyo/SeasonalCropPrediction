@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useScrollToTop } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -24,11 +23,17 @@ import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
 import { elevation } from '../constants/elevation';
 import { useAuth } from '../context/AuthContext';
-import { getSoilZones, predictBySubCounty } from '../services/api';
+import { getSoilZones } from '../services/api';
 import {
   cancelWeatherAlertNotification,
+  cancelTipsNotification,
+  cancelSeasonReminders,
   ensureNotificationPermission,
   scheduleWeatherAlertNotification,
+  scheduleTipsNotification,
+  scheduleSeasonReminders,
+  TIPS_PREF_KEY,
+  SEASON_REMINDER_PREF_KEY,
 } from '../services/notifications';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -64,6 +69,7 @@ const ProfileScreen = () => {
   const [photoUri, setPhotoUri] = useState<string | null>(userData?.photoUri || null);
   const [tipsEnabled, setTipsEnabled] = useState(true);
   const [weatherAlerts, setWeatherAlerts] = useState(true);
+  const [seasonReminders, setSeasonReminders] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const headerIn = useRef(new Animated.Value(0)).current;
   const cardIn = useRef(new Animated.Value(0)).current;
@@ -128,11 +134,13 @@ const ProfileScreen = () => {
     const loadPrefs = async () => {
       try {
         const dm = await AsyncStorage.getItem('smartcrop_dark_mode');
-        const tips = await AsyncStorage.getItem('smartcrop_tips');
+        const tips = await AsyncStorage.getItem(TIPS_PREF_KEY);
         const alerts = await AsyncStorage.getItem('smartcrop_weather_alerts');
+        const season = await AsyncStorage.getItem(SEASON_REMINDER_PREF_KEY);
         if (dm !== null) setDarkMode(dm === 'true');
         if (tips !== null) setTipsEnabled(tips === 'true');
         if (alerts !== null) setWeatherAlerts(alerts === 'true');
+        if (season !== null) setSeasonReminders(season === 'true');
       } catch {
         // Ignore preference load errors.
       } finally {
@@ -209,93 +217,15 @@ const ProfileScreen = () => {
     }
   };
 
-  const ensureAndroidTipsChannel = async () => {
-    if (Platform.OS !== 'android') return;
-    await Notifications.setNotificationChannelAsync('farming-tips', {
-      name: 'Farming tips',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 200, 200, 200],
-      lightColor: '#4A9C5A',
-    });
-  };
+  const scheduleTips = (requestPermission = true) =>
+    scheduleTipsNotification({ subCounty: savedSubCounty, region: savedRegion, requestPermission });
 
-  const buildTipsNotificationContent = async () => {
-    const seasonValue = getCurrentSeason();
-    const fallback = {
-      title: `SmartCrop ${seasonValue} season tip`,
-      body: `Plan field work in ${savedSubCounty} around soil moisture, timely planting, and regular crop scouting this week.`,
-    };
-    try {
-      const prediction = await predictBySubCounty({
-        sub_county: savedSubCounty,
-        season: seasonValue,
-      });
-      const topCrop = prediction?.recommendations?.[0]?.crop;
-      const weatherExpectation = String(prediction?.season_advice?.weather_expectation || '').trim();
-      const focus = String(prediction?.season_advice?.focus || '').trim();
-      if (!topCrop && !weatherExpectation && !focus) return fallback;
-      const seasonLower = seasonValue.toLowerCase();
-      const focusLine = weatherExpectation || focus;
-      return {
-        title: `SmartCrop ${seasonValue} season tip`,
-        body: topCrop
-          ? `${savedSubCounty}: prioritize ${topCrop} this ${seasonLower} season. ${focusLine || 'Check soil moisture before planting.'}`
-          : `${savedSubCounty}: ${focusLine || fallback.body}`,
-      };
-    } catch {
-      return fallback;
-    }
-  };
+  const cancelTips = () => cancelTipsNotification();
 
-  const scheduleTips = async (requestPermission = true) => {
-    await ensureAndroidTipsChannel();
-    const ok = await ensureNotificationPermission(requestPermission);
-    if (!ok) return false;
-    const existing = await AsyncStorage.getItem('smartcrop_tips_notif_id');
-    if (existing) {
-      await Notifications.cancelScheduledNotificationAsync(existing);
-    }
-    const content = await buildTipsNotificationContent();
-    const id = await Notifications.scheduleNotificationAsync({
-      content,
-      trigger:
-        Platform.OS === 'android'
-          ? {
-              type: Notifications.SchedulableTriggerInputTypes.DAILY,
-              hour: 8,
-              minute: 0,
-              channelId: 'farming-tips',
-            }
-          : {
-              type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-              weekday: 1,
-              hour: 8,
-              minute: 0,
-            },
-    });
-    await AsyncStorage.setItem('smartcrop_tips_notif_id', id);
-    return true;
-  };
+  const scheduleWeatherAlerts = (requestPermission = true) =>
+    scheduleWeatherAlertNotification({ subCounty: savedSubCounty, region: savedRegion, requestPermission });
 
-  const cancelTips = async () => {
-    const existing = await AsyncStorage.getItem('smartcrop_tips_notif_id');
-    if (existing) {
-      await Notifications.cancelScheduledNotificationAsync(existing);
-      await AsyncStorage.removeItem('smartcrop_tips_notif_id');
-    }
-  };
-
-  const scheduleWeatherAlerts = async (requestPermission = true) => {
-    return scheduleWeatherAlertNotification({
-      subCounty: savedSubCounty,
-      region: savedRegion,
-      requestPermission,
-    });
-  };
-
-  const cancelWeatherAlerts = async () => {
-    await cancelWeatherAlertNotification();
-  };
+  const cancelWeatherAlerts = () => cancelWeatherAlertNotification();
 
   const handleTipsToggle = async (v: boolean) => {
     try {
@@ -338,6 +268,28 @@ const ProfileScreen = () => {
       }
     } catch {
       toast.show({ message: 'Could not update weather alerts notification.', tone: 'error' });
+    }
+  };
+
+  const handleSeasonRemindersToggle = async (v: boolean) => {
+    try {
+      if (v) {
+        const ok = await scheduleSeasonReminders({ subCounty: savedSubCounty });
+        if (!ok) {
+          toast.show({ message: 'Enable notifications to receive season reminders.', tone: 'warning' });
+          setSeasonReminders(false);
+          await savePref(SEASON_REMINDER_PREF_KEY, false);
+          return;
+        }
+        setSeasonReminders(true);
+        await savePref(SEASON_REMINDER_PREF_KEY, true);
+      } else {
+        await cancelSeasonReminders();
+        setSeasonReminders(false);
+        await savePref(SEASON_REMINDER_PREF_KEY, false);
+      }
+    } catch {
+      toast.show({ message: 'Could not update season reminders.', tone: 'error' });
     }
   };
 
@@ -513,6 +465,14 @@ const ProfileScreen = () => {
               description="Be notified about heavy rain or dry spells."
               value={weatherAlerts}
               onValueChange={handleWeatherAlertsToggle}
+            />
+            <SettingRow
+              colors={colors}
+              icon="calendar-star"
+              title="Season reminders"
+              description="Get notified when First (March) and Second (August) seasons start."
+              value={seasonReminders}
+              onValueChange={handleSeasonRemindersToggle}
               isLast
             />
           </Card>

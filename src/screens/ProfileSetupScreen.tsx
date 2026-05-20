@@ -16,6 +16,7 @@ import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
 import { getSoilZones } from '../services/api';
+import { setupInitialNotifications } from '../services/notifications';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
 import TextField from '../components/TextField';
@@ -157,6 +158,8 @@ const ProfileSetupScreen = () => {
         soilType,
         profileComplete: true,
       });
+      // Fire-and-forget: request permission + schedule all notifications
+      setupInitialNotifications({ subCounty, region: 'Luwero' }).catch(() => {});
     } catch (e: any) {
       setError(e?.message || 'Could not save profile.');
     } finally {
