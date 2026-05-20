@@ -30,7 +30,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "baseUrl": "/SeasonalCropPrediction"
+      "baseUrl": "/SeasonalCropPrediction",
+      "shortName": "SmartCrop",
+      "description": "AI-powered crop recommendations for Luwero farmers",
+      "themeColor": "#1B5E3C",
+      "backgroundColor": "#ffffff",
+      "display": "standalone"
     },
     "extra": {
       "eas": {
