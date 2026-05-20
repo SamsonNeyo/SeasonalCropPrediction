@@ -1,6 +1,6 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 type CacheEntry = { ts: number; data: any };
 const MEMORY_CACHE = new Map<string, CacheEntry>();
@@ -89,7 +89,18 @@ export const api = axios.create({
 
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
+  async (error) => {
+    const config = error.config as any;
+    // Retry once on network errors or timeout (cold-start wake-up window)
+    if (
+      axios.isAxiosError(error) &&
+      !error.response &&
+      !config.__retried
+    ) {
+      config.__retried = true;
+      await new Promise((r) => setTimeout(r, 2000));
+      return api(config);
+    }
     if (axios.isAxiosError(error) && !error.response) {
       const friendly = new Error(
         `Could not reach the server at ${API_BASE}. Check that the backend is running and on the same network.`,
@@ -119,10 +130,15 @@ export const predictBySubCounty = async (data: { sub_county: string; season?: st
   return res.data;
 };
 
-// Fire immediately at module load — wakes the Render free-tier during JS bundle
-// execution, before Firebase auth even resolves, so the first real API call is fast.
-getSoilZones().catch(() => {});
+const pingBackend = () => api.get('/ping').catch(() => {});
 
-export const warmupBackend = () => {
-  getSoilZones().catch(() => {});
-};
+// Fire on module load — wakes Render free-tier before Firebase auth resolves.
+pingBackend();
+
+// Re-ping every time the app comes back to the foreground so a returning
+// user doesn't hit a cold backend after the server has spun down.
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') pingBackend();
+});
+
+export const warmupBackend = pingBackend;

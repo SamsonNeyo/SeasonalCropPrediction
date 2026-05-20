@@ -37,6 +37,10 @@ async def _startup():
     except Exception:
         pass
 
+@app.get("/ping")
+async def ping():
+    return {"status": "ok"}
+
 @app.post("/predict")
 async def predict_crop(request: PredictionRequest):
     season_value = "First" if str(request.season).strip().lower() in {"1", "first", "first season"} else "Second"
