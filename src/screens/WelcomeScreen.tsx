@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
+  TouchableOpacity,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { ThemeColors } from '../constants/colors';
 import { FONT_FAMILY, TYPE, WEIGHT } from '../constants/typography';
 import { RADIUS, SPACING } from '../constants/spacing';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 type Feature = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -57,6 +59,18 @@ const WelcomeScreen = ({ navigation }: any) => {
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [guestLoading, setGuestLoading] = useState(false);
   const [guestError, setGuestError] = useState('');
+  const { canInstall, install, dismiss } = usePWAInstall();
+  const bannerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (canInstall) {
+      Animated.timing(bannerAnim, {
+        toValue: 1, duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [canInstall, bannerAnim]);
 
   const handleGuest = async () => {
     try {
@@ -96,6 +110,27 @@ const WelcomeScreen = ({ navigation }: any) => {
 
   const heroNode = (
     <View style={[styles.hero, isDesktopWeb && styles.heroFlush]}>
+      {/* PWA install banner — web only, shown when browser offers install */}
+      {canInstall && (
+        <Animated.View
+          style={[
+            styles.pwaBanner,
+            {
+              opacity: bannerAnim,
+              transform: [{ translateY: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }],
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="cellphone-arrow-down" size={18} color="#fff" />
+          <Text style={styles.pwaBannerText}>Add SmartCrop to your home screen</Text>
+          <TouchableOpacity onPress={install} style={styles.pwaInstallBtn} accessibilityRole="button" accessibilityLabel="Install app">
+            <Text style={styles.pwaInstallBtnText}>Install</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={dismiss} style={styles.pwaDismissBtn} accessibilityRole="button" accessibilityLabel="Dismiss install prompt">
+            <MaterialCommunityIcons name="close" size={14} color="rgba(255,255,255,0.7)" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
       <Animated.View
         style={[
           styles.heroContent,
@@ -272,6 +307,46 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     scroll: { flexGrow: 1 },
     // Desktop web: full-page scroll
     scrollContent: { flexGrow: 1 },
+
+    // ── PWA install banner ──
+    pwaBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      backgroundColor: 'rgba(0,0,0,0.22)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.18)',
+      borderRadius: RADIUS.lg,
+      paddingVertical: SPACING.sm + 2,
+      paddingHorizontal: SPACING.md,
+      marginBottom: SPACING.lg,
+      width: '100%',
+      maxWidth: 420,
+    },
+    pwaBannerText: {
+      flex: 1,
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: 'rgba(255,255,255,0.92)',
+      fontWeight: WEIGHT.semibold,
+    },
+    pwaInstallBtn: {
+      backgroundColor: 'rgba(255,255,255,0.18)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.3)',
+      borderRadius: RADIUS.pill,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+    },
+    pwaInstallBtnText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      color: '#fff',
+      fontWeight: WEIGHT.bold,
+    },
+    pwaDismissBtn: {
+      padding: 4,
+    },
 
     // ── Hero ──
     hero: {
