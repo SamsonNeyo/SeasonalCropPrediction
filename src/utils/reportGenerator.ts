@@ -115,7 +115,6 @@ const buildHtml = (opts: ReportOptions): string => {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SmartCrop Report — ${generatedAt}</title>
-<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};}</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a2a1a;background:#f3f8f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -247,6 +246,9 @@ tr:last-child td{border-bottom:none}
 </html>`;
 };
 
+const isMobileWeb = (): boolean =>
+  typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 export const downloadReport = async (opts: ReportOptions): Promise<void> => {
   if (Platform.OS === 'web') {
     const html = buildHtml(opts);
@@ -254,6 +256,14 @@ export const downloadReport = async (opts: ReportOptions): Promise<void> => {
     if (win) {
       win.document.write(html);
       win.document.close();
+      // Only auto-trigger print on desktop — mobile browsers hang on window.print()
+      if (!isMobileWeb()) {
+        win.onload = () => {
+          win.focus();
+          win.print();
+          win.onafterprint = () => win.close();
+        };
+      }
     }
     return;
   }
@@ -332,7 +342,6 @@ const buildSingleHtml = (
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SmartCrop Record — ${recordDate}</title>
-<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};}</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a2a1a;background:#f3f8f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -458,6 +467,13 @@ export const downloadSingleRecord = async (
     if (win) {
       win.document.write(html);
       win.document.close();
+      if (!isMobileWeb()) {
+        win.onload = () => {
+          win.focus();
+          win.print();
+          win.onafterprint = () => win.close();
+        };
+      }
     }
     return;
   }
