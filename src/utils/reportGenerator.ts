@@ -1,4 +1,6 @@
-import { Platform, Share } from 'react-native';
+import { Platform } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 export type ReportItem = {
   id: string;
@@ -256,37 +258,20 @@ export const downloadReport = async (opts: ReportOptions): Promise<void> => {
     return;
   }
 
-  // Mobile: share a formatted text summary via the native share sheet
-  const { items, userName, region, subCounty } = opts;
-  const now = new Date();
-  const lines = [
-    'SmartCrop — Prediction History Report',
-    `Generated: ${now.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}`,
-    `Farmer: ${userName || 'SmartCrop User'}`,
-    `Region: ${region || 'Luwero'}${subCounty ? ` · ${subCounty}` : ''}`,
-    '',
-    '── SUMMARY ─────────────────────────',
-    `Total records: ${items.length}`,
-    `First Season:  ${items.filter((i) => normalizeSeason(i.season) === 'First Season').length}`,
-    `Second Season: ${items.filter((i) => normalizeSeason(i.season) === 'Second Season').length}`,
-    '',
-    '── RECORDS ─────────────────────────',
-    ...items.map((item, idx) =>
-      [
-        `${String(idx + 1).padStart(2, '0')}. ${formatDate(item)}  |  ${normalizeSeason(item.season)}`,
-        `    Location : ${item.sub_county || region || '—'} · ${item.soil_type || '—'}`,
-        `    Conditions: ${item.temperature != null ? `${item.temperature}°C` : '—'} · ${item.rainfall != null ? `${item.rainfall} mm` : '—'}`,
-        `    Top crops : ${getTopCrops(item)} (${getTopConfidence(item)})`,
-      ].join('\n'),
-    ),
-    '',
-    'SmartCrop — Luwero Crop Intelligence',
-  ];
-
-  await Share.share({
-    message: lines.join('\n'),
-    title: `SmartCrop_Report_${now.toISOString().slice(0, 10)}`,
-  });
+  // Mobile: generate a real PDF from the same HTML and share/save it
+  const html = buildHtml(opts);
+  const { uri } = await Print.printToFileAsync({ html });
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const destUri = uri.replace(/[^/]+$/, `SmartCrop_Report_${dateStr}.pdf`);
+  // rename for a cleaner share title (expo-print names it randomly)
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(destUri.endsWith('.pdf') ? destUri : uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `SmartCrop Report — ${dateStr}`,
+      UTI: 'com.adobe.pdf',
+    });
+  }
 };
 
 // ── Single record report ──────────────────────────────────────────────────────
@@ -477,35 +462,15 @@ export const downloadSingleRecord = async (
     return;
   }
 
-  const recs = item.recommendations || [];
-  const lines = [
-    'SmartCrop — Prediction Record',
-    `Date: ${formatDate(item)}`,
-    `Season: ${normalizeSeason(item.season)}`,
-    `Location: ${item.sub_county || opts.region || '—'} · Soil: ${item.soil_type || '—'}`,
-    `Conditions: Temp ${item.temperature != null ? `${item.temperature}°C` : '—'} · Rainfall ${item.rainfall != null ? `${item.rainfall} mm` : '—'}`,
-    '',
-    '── RECOMMENDATIONS ─────────────────',
-    ...recs.map((r, i) => {
-      const score = r.confidence_score ?? r.confidence;
-      const pct = score == null ? '' : score > 1 ? `${Math.round(score)}%` : `${Math.round(score * 100)}%`;
-      return `${i + 1}. ${r.crop}${pct ? `  (${pct})` : ''}${r.explanation ? `\n   ${r.explanation}` : ''}`;
-    }),
-    '',
-    ...(recs[0]?.planning
-      ? [
-          `── PLANTING PLAN — ${recs[0].crop} ─────`,
-          `Duration: ${recs[0].planning?.duration_days || '—'} days`,
-          `Harvest: ${recs[0].planning?.harvest_window || '—'}`,
-          ...(recs[0].planning?.planning_actions || []).map((a) => `• ${a}`),
-        ]
-      : []),
-    '',
-    'SmartCrop — Luwero Crop Intelligence',
-  ];
-
-  await Share.share({
-    message: lines.join('\n'),
-    title: `SmartCrop_Record_${item.sub_county || 'Luwero'}`,
-  });
+  // Mobile: generate a real PDF and share/save it
+  const html = buildSingleHtml(item, opts);
+  const { uri } = await Print.printToFileAsync({ html });
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `SmartCrop Record — ${formatDate(item)}`,
+      UTI: 'com.adobe.pdf',
+    });
+  }
 };
