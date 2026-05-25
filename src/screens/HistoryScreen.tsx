@@ -8,6 +8,7 @@ import {
   Animated,
   Easing,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useScrollToTop } from '@react-navigation/native';
@@ -29,12 +30,14 @@ import Skeleton, { SkeletonGroup } from '../components/Skeleton';
 import SelectSheet, { SelectOption } from '../components/SelectSheet';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
+import { downloadReport } from '../utils/reportGenerator';
 
 const HistoryScreen = () => {
   const PAGE_SIZE = 50;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
+  const [generatingReport, setGeneratingReport] = useState(false);
   const toast = useToast();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -221,6 +224,25 @@ const HistoryScreen = () => {
 
   const filtersActive = filterYear !== 'all' || filterSeason !== 'all';
 
+  const handleGenerateReport = async () => {
+    if (filteredItems.length === 0) return;
+    try {
+      setGeneratingReport(true);
+      await downloadReport({
+        items: filteredItems,
+        userName: userData?.name || user?.email?.split('@')[0],
+        region: userData?.region || 'Luwero',
+        subCounty: userData?.subCounty,
+        filterYear,
+        filterSeason,
+      });
+    } catch {
+      toast.show({ message: 'Could not generate report.', tone: 'error' });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.bgAccent} />
@@ -250,13 +272,24 @@ const HistoryScreen = () => {
             <Text style={styles.title}>History</Text>
             <Text style={styles.subtitle}>Your recent predictions and manual analyses</Text>
           </View>
-          <IconButton
-            icon="refresh"
-            onPress={loadHistory}
-            variant="soft"
-            size="md"
-            accessibilityLabel="Refresh history"
-          />
+          <View style={styles.headerActions}>
+            <IconButton
+              icon="refresh"
+              onPress={loadHistory}
+              variant="soft"
+              size="md"
+              accessibilityLabel="Refresh history"
+            />
+            {filteredItems.length > 0 && !loading && (
+              <IconButton
+                icon={generatingReport ? 'loading' : 'file-download-outline'}
+                onPress={handleGenerateReport}
+                variant="soft"
+                size="md"
+                accessibilityLabel="Download report"
+              />
+            )}
+          </View>
         </Animated.View>
 
         <Card variant="glass" padding="lg" emphasis="md" style={styles.filterCard}>
@@ -326,6 +359,24 @@ const HistoryScreen = () => {
                 ? `${summary.hidden} record${summary.hidden === 1 ? '' : 's'} hidden by current filters`
                 : 'All records are currently shown'}
             </Text>
+            {summary.shown > 0 && !loading && (
+              <TouchableOpacity
+                style={styles.reportBtn}
+                onPress={handleGenerateReport}
+                disabled={generatingReport}
+                accessibilityRole="button"
+                accessibilityLabel="Download report"
+              >
+                <MaterialCommunityIcons
+                  name={generatingReport ? 'progress-clock' : 'file-download-outline'}
+                  size={15}
+                  color={colors.primary}
+                />
+                <Text style={styles.reportBtnText}>
+                  {generatingReport ? 'Generating…' : `Download report (${summary.shown})`}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -495,6 +546,7 @@ const createStyles = (c: ThemeColors) =>
       marginRight: SPACING.md,
     },
     headerText: { flex: 1 },
+    headerActions: { flexDirection: 'row', gap: SPACING.sm },
     title: { fontFamily: FONT_FAMILY, fontSize: TYPE.title, fontWeight: WEIGHT.bold, color: c.primary },
     subtitle: {
       fontFamily: FONT_FAMILY,
@@ -577,6 +629,25 @@ const createStyles = (c: ThemeColors) =>
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.caption,
       color: c.lightText,
+    },
+    reportBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs + 2,
+      marginTop: SPACING.md,
+      alignSelf: 'flex-start',
+      backgroundColor: c.iconBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      borderRadius: RADIUS.pill,
+      paddingVertical: SPACING.xs + 2,
+      paddingHorizontal: SPACING.md,
+    },
+    reportBtnText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+      color: c.primary,
     },
     skel: { gap: SPACING.md },
     card: {
