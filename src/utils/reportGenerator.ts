@@ -7,7 +7,17 @@ export type ReportItem = {
   temperature?: number;
   rainfall?: number;
   season?: any;
-  recommendations?: Array<{ crop: string; confidence_score?: number; confidence?: number }>;
+  recommendations?: Array<{
+    crop: string;
+    confidence_score?: number;
+    confidence?: number;
+    explanation?: string;
+    planning?: {
+      duration_days?: string;
+      harvest_window?: string;
+      planning_actions?: string[];
+    };
+  }>;
   createdAt?: any;
   timestamp?: any;
 };
@@ -289,5 +299,237 @@ export const downloadReport = async (opts: ReportOptions): Promise<void> => {
   await Share.share({
     message: lines.join('\n'),
     title: `SmartCrop_Report_${now.toISOString().slice(0, 10)}`,
+  });
+};
+
+// ── Single record report ──────────────────────────────────────────────────────
+
+const buildSingleHtml = (
+  item: ReportItem,
+  opts: { userName?: string; region?: string; subCounty?: string },
+): string => {
+  const now = new Date();
+  const generatedAt = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const generatedTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const recordDate = formatDate(item);
+  const season = normalizeSeason(item.season);
+  const location = item.sub_county || opts.subCounty || opts.region || '—';
+
+  const recs = item.recommendations || [];
+  const recRows = recs
+    .map((r, i) => {
+      const score = r.confidence_score ?? r.confidence;
+      const pct = score == null ? 0 : score > 1 ? Math.round(score) : Math.round(score * 100);
+      const barWidth = Math.max(4, Math.min(100, pct));
+      return `
+      <tr class="${i % 2 === 0 ? '' : 'alt'}">
+        <td class="c rank">${i + 1}</td>
+        <td class="crop-name">${r.crop || '—'}</td>
+        <td>
+          <div class="bar-wrap">
+            <div class="bar-fill" style="width:${barWidth}%"></div>
+          </div>
+        </td>
+        <td class="c conf">${score != null ? `${pct}%` : '—'}</td>
+        <td class="explain">${r.explanation || ''}</td>
+      </tr>`;
+    })
+    .join('');
+
+  const top = recs[0];
+  const plan = top?.planning;
+  const planHtml = plan
+    ? `
+    <div class="plan-box">
+      <div class="sec">Planting Plan — ${top.crop || 'Top Crop'}</div>
+      <div class="plan-grid">
+        <div class="plan-item"><div class="plan-lbl">Duration</div><div class="plan-val">${plan.duration_days || '—'} days</div></div>
+        <div class="plan-item"><div class="plan-lbl">Harvest window</div><div class="plan-val">${plan.harvest_window || '—'}</div></div>
+      </div>
+      ${
+        (plan.planning_actions || []).length > 0
+          ? `<ul class="actions">${(plan.planning_actions || []).map((a) => `<li>${a}</li>`).join('')}</ul>`
+          : ''
+      }
+    </div>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SmartCrop Record — ${recordDate}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a2a1a;background:#f3f8f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{max-width:780px;margin:0 auto;padding:32px 24px}
+
+.hdr{background:linear-gradient(135deg,#1B5E3C 0%,#2E7D52 100%);border-radius:16px;padding:26px 30px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-ico{width:46px;height:46px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.brand-name{font-size:22px;font-weight:800}
+.brand-tag{font-size:12px;opacity:.72;margin-top:2px}
+.rpt-meta{text-align:right}
+.rpt-title{font-size:16px;font-weight:700}
+.rpt-date{font-size:11px;opacity:.8;margin-top:4px}
+.rpt-badge{display:inline-block;margin-top:7px;background:rgba(255,255,255,.18);border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600}
+
+.ubar{background:#fff;border:1px solid #dceadc;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;gap:24px;flex-wrap:wrap}
+.uf-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#7a9a7a;font-weight:700}
+.uf-val{font-size:13px;font-weight:700;color:#1B5E3C;margin-top:2px}
+
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px}
+.meta-card{background:#fff;border:1px solid #dceadc;border-radius:10px;padding:12px 14px}
+.meta-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#7a9a7a;font-weight:700}
+.meta-val{font-size:18px;font-weight:800;color:#1B5E3C;margin-top:3px}
+
+.sec{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:#2E7D52;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.sec::after{content:'';flex:1;height:1px;background:#dceadc}
+
+.tbl-wrap{background:#fff;border:1px solid #dceadc;border-radius:12px;overflow:hidden;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead{background:#1B5E3C;color:#fff}
+th{padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+th.c{text-align:center}
+tbody tr.alt{background:#f3f9f4}
+td{padding:9px 12px;border-bottom:1px solid #edf5ed;vertical-align:middle}
+td.c{text-align:center}
+td.rank{color:#7a9a7a;font-weight:700;font-size:13px}
+td.conf{color:#1B5E3C;font-weight:800;white-space:nowrap}
+td.crop-name{font-weight:700;color:#1a2a1a}
+td.explain{font-size:11px;color:#6a8a6a;max-width:220px}
+tr:last-child td{border-bottom:none}
+.bar-wrap{background:#e8f5e9;border-radius:4px;height:7px;width:100%;min-width:60px}
+.bar-fill{background:linear-gradient(90deg,#2E7D52,#4CAF50);border-radius:4px;height:100%}
+
+.plan-box{background:#fff;border:1px solid #dceadc;border-radius:12px;padding:16px 18px;margin-bottom:20px}
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.plan-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#7a9a7a;font-weight:700}
+.plan-val{font-size:14px;font-weight:700;color:#1B5E3C;margin-top:3px}
+.actions{padding-left:18px;margin-top:0}
+.actions li{font-size:12.5px;color:#2a3a2a;line-height:1.7;padding:1px 0}
+
+.ftr{border-top:1px solid #dceadc;padding-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.ftr-txt{font-size:11px;color:#aabcaa}
+.ftr-brand{font-size:12px;font-weight:700;color:#2E7D52}
+
+@media print{
+  body{background:#fff}
+  .page{padding:0;max-width:100%}
+  .hdr,.tbl-wrap,.plan-box{border-radius:0}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="brand">
+      <div class="brand-ico">🌱</div>
+      <div>
+        <div class="brand-name">SmartCrop</div>
+        <div class="brand-tag">AI-Powered Crop Recommendations · Luwero District</div>
+      </div>
+    </div>
+    <div class="rpt-meta">
+      <div class="rpt-title">Single Prediction Record</div>
+      <div class="rpt-date">Generated ${generatedAt} at ${generatedTime}</div>
+      <div class="rpt-badge">${season} · ${recordDate}</div>
+    </div>
+  </header>
+
+  <div class="ubar">
+    <div><div class="uf-label">Farmer</div><div class="uf-val">${opts.userName || 'SmartCrop User'}</div></div>
+    <div><div class="uf-label">Region</div><div class="uf-val">${opts.region || 'Luwero'}</div></div>
+    <div><div class="uf-label">Sub-county</div><div class="uf-val">${location}</div></div>
+    <div><div class="uf-label">Season</div><div class="uf-val">${season}</div></div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-card"><div class="meta-lbl">Soil Type</div><div class="meta-val" style="font-size:14px">${item.soil_type || '—'}</div></div>
+    <div class="meta-card"><div class="meta-lbl">Temperature</div><div class="meta-val">${item.temperature != null ? `${item.temperature}°C` : '—'}</div></div>
+    <div class="meta-card"><div class="meta-lbl">Rainfall</div><div class="meta-val">${item.rainfall != null ? `${item.rainfall} mm` : '—'}</div></div>
+    <div class="meta-card"><div class="meta-lbl">Top Recommendation</div><div class="meta-val" style="font-size:14px">${recs[0]?.crop || '—'}</div></div>
+  </div>
+
+  <div class="sec">All Recommendations</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="c">#</th>
+          <th>Crop</th>
+          <th>Confidence</th>
+          <th class="c">Score</th>
+          <th>Why it fits</th>
+        </tr>
+      </thead>
+      <tbody>${recRows}</tbody>
+    </table>
+  </div>
+
+  ${planHtml}
+
+  <footer class="ftr">
+    <div class="ftr-txt">Generated by SmartCrop · ${generatedAt} · To save as PDF: File → Print → Save as PDF</div>
+    <div class="ftr-brand">SmartCrop — Luwero Crop Intelligence</div>
+  </footer>
+
+</div>
+</body>
+</html>`;
+};
+
+export const downloadSingleRecord = async (
+  item: ReportItem,
+  opts: { userName?: string; region?: string; subCounty?: string } = {},
+): Promise<void> => {
+  if (Platform.OS === 'web') {
+    const html = buildSingleHtml(item, opts);
+    const dateStr = formatDate(item).replace(/\s/g, '_');
+    const filename = `SmartCrop_Record_${item.sub_county || 'Luwero'}_${dateStr}.html`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  const recs = item.recommendations || [];
+  const lines = [
+    'SmartCrop — Prediction Record',
+    `Date: ${formatDate(item)}`,
+    `Season: ${normalizeSeason(item.season)}`,
+    `Location: ${item.sub_county || opts.region || '—'} · Soil: ${item.soil_type || '—'}`,
+    `Conditions: Temp ${item.temperature != null ? `${item.temperature}°C` : '—'} · Rainfall ${item.rainfall != null ? `${item.rainfall} mm` : '—'}`,
+    '',
+    '── RECOMMENDATIONS ─────────────────',
+    ...recs.map((r, i) => {
+      const score = r.confidence_score ?? r.confidence;
+      const pct = score == null ? '' : score > 1 ? `${Math.round(score)}%` : `${Math.round(score * 100)}%`;
+      return `${i + 1}. ${r.crop}${pct ? `  (${pct})` : ''}${r.explanation ? `\n   ${r.explanation}` : ''}`;
+    }),
+    '',
+    ...(recs[0]?.planning
+      ? [
+          `── PLANTING PLAN — ${recs[0].crop} ─────`,
+          `Duration: ${recs[0].planning?.duration_days || '—'} days`,
+          `Harvest: ${recs[0].planning?.harvest_window || '—'}`,
+          ...(recs[0].planning?.planning_actions || []).map((a) => `• ${a}`),
+        ]
+      : []),
+    '',
+    'SmartCrop — Luwero Crop Intelligence',
+  ];
+
+  await Share.share({
+    message: lines.join('\n'),
+    title: `SmartCrop_Record_${item.sub_county || 'Luwero'}`,
   });
 };

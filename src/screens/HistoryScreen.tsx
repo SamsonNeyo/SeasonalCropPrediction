@@ -30,7 +30,7 @@ import Skeleton, { SkeletonGroup } from '../components/Skeleton';
 import SelectSheet, { SelectOption } from '../components/SelectSheet';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
-import { downloadReport } from '../utils/reportGenerator';
+import { downloadReport, downloadSingleRecord } from '../utils/reportGenerator';
 
 const HistoryScreen = () => {
   const PAGE_SIZE = 50;
@@ -38,6 +38,8 @@ const HistoryScreen = () => {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, userData } = useAuth();
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const toast = useToast();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,6 +225,24 @@ const HistoryScreen = () => {
   ];
 
   const filtersActive = filterYear !== 'all' || filterSeason !== 'all';
+
+  const toggleExpand = (id: string) =>
+    setExpandedId((prev) => (prev === id ? null : id));
+
+  const handleDownloadSingle = async (item: any) => {
+    try {
+      setDownloadingId(item.id);
+      await downloadSingleRecord(item, {
+        userName: userData?.name || user?.email?.split('@')[0],
+        region: userData?.region || 'Luwero',
+        subCounty: userData?.subCounty,
+      });
+    } catch {
+      toast.show({ message: 'Could not generate record.', tone: 'error' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const handleGenerateReport = async () => {
     if (filteredItems.length === 0) return;
@@ -434,39 +454,154 @@ const HistoryScreen = () => {
           ) : (
             filteredItems.map((item) => {
               const itemDate = getItemDate(item);
-              return (
-                <View key={item.id} style={styles.card}>
-                  <View style={styles.cardRow}>
-                    <View style={styles.cardIcon}>
-                      <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>
-                        {item.sub_county || 'Luwero'} · {normalizeSeason(item.season) || 'Season'}
-                      </Text>
-                      <Text style={styles.cardSub}>
-                        {item.soil_type || 'Mapped soil'} · {item.temperature ?? '—'}°C · {item.rainfall ?? '—'} mm
-                      </Text>
-                    </View>
-                    <IconButton
-                      icon="trash-can-outline"
-                      onPress={() => confirmDelete(item.id)}
-                      variant="danger"
-                      size="sm"
-                      accessibilityLabel="Delete record"
-                    />
-                  </View>
+              const isExpanded = expandedId === item.id;
+              const recs: any[] = item.recommendations || [];
+              const topPlan = recs[0]?.planning;
 
-                  <View style={styles.recRow}>
-                    {(item.recommendations || []).slice(0, 3).map((rec: any, idx: number) => (
-                      <Chip key={idx} label={rec.crop} size="sm" tone="success" />
-                    ))}
-                  </View>
-                  {!!itemDate && (
-                    <Text style={styles.timestampText}>
-                      <MaterialCommunityIcons name="clock-outline" size={11} color={colors.lightText} />{' '}
-                      {itemDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                    </Text>
+              return (
+                <View key={item.id} style={[styles.card, isExpanded && styles.cardExpanded]}>
+                  {/* Tappable header */}
+                  <TouchableOpacity
+                    onPress={() => toggleExpand(item.id)}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel={isExpanded ? 'Collapse record' : 'Expand record'}
+                  >
+                    <View style={styles.cardRow}>
+                      <View style={styles.cardIcon}>
+                        <MaterialCommunityIcons name="sprout" size={18} color={colors.primary} />
+                      </View>
+                      <View style={styles.cardText}>
+                        <Text style={styles.cardTitle}>
+                          {item.sub_county || 'Luwero'} · {normalizeSeason(item.season) || 'Season'} Season
+                        </Text>
+                        <Text style={styles.cardSub}>
+                          {item.soil_type || 'Mapped soil'} · {item.temperature ?? '—'}°C · {item.rainfall ?? '—'} mm
+                        </Text>
+                      </View>
+                      <MaterialCommunityIcons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color={colors.lightText}
+                        style={{ marginLeft: SPACING.xs }}
+                      />
+                    </View>
+                    <View style={styles.recRow}>
+                      {recs.slice(0, 3).map((rec: any, idx: number) => (
+                        <Chip key={idx} label={rec.crop} size="sm" tone="success" />
+                      ))}
+                    </View>
+                    {!!itemDate && (
+                      <Text style={styles.timestampText}>
+                        <MaterialCommunityIcons name="clock-outline" size={11} color={colors.lightText} />{' '}
+                        {itemDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <View style={styles.expandedWrap}>
+                      <View style={styles.expandDivider} />
+
+                      {/* All recommendations */}
+                      <Text style={styles.expandSection}>All Recommendations</Text>
+                      {recs.map((rec: any, idx: number) => {
+                        const score = rec.confidence_score ?? rec.confidence;
+                        const pct = score == null ? 0 : score > 1 ? Math.round(score) : Math.round(score * 100);
+                        return (
+                          <View key={idx} style={styles.recDetailRow}>
+                            <View style={styles.recRank}>
+                              <Text style={styles.recRankText}>{idx + 1}</Text>
+                            </View>
+                            <View style={styles.recDetailBody}>
+                              <View style={styles.recDetailTop}>
+                                <Text style={styles.recCropName}>{rec.crop}</Text>
+                                <Text style={styles.recConfPct}>{score != null ? `${pct}%` : '—'}</Text>
+                              </View>
+                              {score != null && (
+                                <View style={styles.confBarWrap}>
+                                  <View style={[styles.confBarFill, { width: `${pct}%` as any }]} />
+                                </View>
+                              )}
+                              {!!rec.explanation && (
+                                <Text style={styles.recExplain}>{rec.explanation}</Text>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+
+                      {/* Planting plan */}
+                      {!!topPlan && (
+                        <View style={styles.planBox}>
+                          <Text style={styles.expandSection}>
+                            Planting Plan — {recs[0]?.crop}
+                          </Text>
+                          <View style={styles.planMetaRow}>
+                            {!!topPlan.duration_days && (
+                              <View style={styles.planMetaItem}>
+                                <Text style={styles.planMetaLabel}>Duration</Text>
+                                <Text style={styles.planMetaValue}>{topPlan.duration_days} days</Text>
+                              </View>
+                            )}
+                            {!!topPlan.harvest_window && (
+                              <View style={styles.planMetaItem}>
+                                <Text style={styles.planMetaLabel}>Harvest window</Text>
+                                <Text style={styles.planMetaValue}>{topPlan.harvest_window}</Text>
+                              </View>
+                            )}
+                          </View>
+                          {(topPlan.planning_actions || []).map((action: string, i: number) => (
+                            <View key={i} style={styles.planAction}>
+                              <View style={styles.planDot} />
+                              <Text style={styles.planActionText}>{action}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Card actions */}
+                      <View style={styles.cardActions}>
+                        <TouchableOpacity
+                          style={styles.cardActionBtn}
+                          onPress={() => handleDownloadSingle(item)}
+                          disabled={downloadingId === item.id}
+                          accessibilityRole="button"
+                          accessibilityLabel="Download this record"
+                        >
+                          <MaterialCommunityIcons
+                            name={downloadingId === item.id ? 'progress-clock' : 'file-download-outline'}
+                            size={14}
+                            color={colors.primary}
+                          />
+                          <Text style={styles.cardActionBtnText}>
+                            {downloadingId === item.id ? 'Generating…' : 'Download record'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.cardActionBtn, styles.cardActionDanger]}
+                          onPress={() => confirmDelete(item.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Delete record"
+                        >
+                          <MaterialCommunityIcons name="trash-can-outline" size={14} color={colors.error} />
+                          <Text style={[styles.cardActionBtnText, { color: colors.error }]}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Collapsed delete button */}
+                  {!isExpanded && (
+                    <TouchableOpacity
+                      style={styles.cardDeleteCorner}
+                      onPress={() => confirmDelete(item.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete record"
+                    >
+                      <MaterialCommunityIcons name="trash-can-outline" size={14} color={colors.lightText} />
+                    </TouchableOpacity>
                   )}
                 </View>
               );
@@ -655,11 +790,15 @@ const createStyles = (c: ThemeColors) =>
       borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: c.glassBorder,
-      padding: SPACING.md + 2,
       marginBottom: SPACING.md,
+      overflow: 'hidden',
       ...elevation(c.shadow, 'sm'),
     },
-    cardRow: { flexDirection: 'row', alignItems: 'center' },
+    cardExpanded: {
+      borderColor: c.primary,
+      borderWidth: 1.5,
+    },
+    cardRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md + 2, paddingTop: SPACING.md + 2 },
     cardIcon: {
       width: 36,
       height: 36,
@@ -684,12 +823,114 @@ const createStyles = (c: ThemeColors) =>
       color: c.lightText,
       marginTop: 3,
     },
-    recRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: SPACING.sm + 2, gap: 6 },
+    recRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: SPACING.sm + 2, gap: 6, paddingHorizontal: SPACING.md + 2 },
     timestampText: {
       fontFamily: FONT_FAMILY,
+      paddingHorizontal: SPACING.md + 2,
+      paddingBottom: SPACING.md,
       marginTop: SPACING.sm,
       color: c.lightText,
       fontSize: TYPE.tiny,
+    },
+    cardDeleteCorner: {
+      position: 'absolute',
+      top: SPACING.sm,
+      right: SPACING.sm,
+      padding: SPACING.xs + 2,
+    },
+    // ── Expanded ──
+    expandedWrap: { paddingHorizontal: SPACING.md + 2, paddingBottom: SPACING.md + 2 },
+    expandDivider: { height: 1, backgroundColor: c.glassBorder, marginVertical: SPACING.md },
+    expandSection: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      fontWeight: WEIGHT.bold,
+      color: c.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: SPACING.sm + 2,
+    },
+    recDetailRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: SPACING.sm,
+      marginBottom: SPACING.sm + 2,
+    },
+    recRank: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: c.pillBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+      flexShrink: 0,
+    },
+    recRankText: { fontFamily: FONT_FAMILY, fontSize: 10, fontWeight: WEIGHT.bold, color: c.secondary },
+    recDetailBody: { flex: 1 },
+    recDetailTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    recCropName: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.bold, color: c.text },
+    recConfPct: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.bold, color: c.primary },
+    confBarWrap: {
+      height: 5,
+      backgroundColor: c.pillBg,
+      borderRadius: 3,
+      marginTop: 5,
+      overflow: 'hidden',
+    },
+    confBarFill: {
+      height: '100%',
+      backgroundColor: c.primary,
+      borderRadius: 3,
+    },
+    recExplain: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.lightText,
+      marginTop: 4,
+      lineHeight: 16,
+    },
+    planBox: { marginTop: SPACING.md },
+    planMetaRow: { flexDirection: 'row', gap: SPACING.md, marginBottom: SPACING.sm + 2 },
+    planMetaItem: { flex: 1 },
+    planMetaLabel: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.tiny,
+      color: c.lightText,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    planMetaValue: { fontFamily: FONT_FAMILY, fontSize: TYPE.bodySmall, fontWeight: WEIGHT.semibold, color: c.text, marginTop: 2 },
+    planAction: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm, marginBottom: SPACING.xs + 2 },
+    planDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: c.secondary, marginTop: 6, flexShrink: 0 },
+    planActionText: { fontFamily: FONT_FAMILY, fontSize: TYPE.caption, color: c.lightText, flex: 1, lineHeight: 18 },
+    cardActions: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      marginTop: SPACING.md + 2,
+      paddingTop: SPACING.md,
+      borderTopWidth: 1,
+      borderTopColor: c.glassBorder,
+    },
+    cardActionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs + 2,
+      backgroundColor: c.iconBg,
+      borderWidth: 1,
+      borderColor: c.pillBorder,
+      borderRadius: RADIUS.pill,
+      paddingVertical: SPACING.xs + 2,
+      paddingHorizontal: SPACING.md,
+    },
+    cardActionDanger: { borderColor: `${c.error}40`, backgroundColor: `${c.error}08` },
+    cardActionBtnText: {
+      fontFamily: FONT_FAMILY,
+      fontSize: TYPE.caption,
+      fontWeight: WEIGHT.semibold,
+      color: c.primary,
     },
     listWrap: {},
     loadMoreBtn: { marginTop: 4, alignSelf: 'center' },
