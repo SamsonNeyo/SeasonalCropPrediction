@@ -246,25 +246,22 @@ tr:last-child td{border-bottom:none}
 </html>`;
 };
 
-const isMobileWeb = (): boolean =>
-  typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const triggerBlobDownload = (html: string, filename: string) => {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 export const downloadReport = async (opts: ReportOptions): Promise<void> => {
   if (Platform.OS === 'web') {
-    const html = buildHtml(opts);
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      // Only auto-trigger print on desktop — mobile browsers hang on window.print()
-      if (!isMobileWeb()) {
-        win.onload = () => {
-          win.focus();
-          win.print();
-          win.onafterprint = () => win.close();
-        };
-      }
-    }
+    const dateStr = new Date().toISOString().slice(0, 10);
+    triggerBlobDownload(buildHtml(opts), `SmartCrop_Report_${dateStr}.html`);
     return;
   }
 
@@ -462,19 +459,9 @@ export const downloadSingleRecord = async (
   opts: { userName?: string; region?: string; subCounty?: string } = {},
 ): Promise<void> => {
   if (Platform.OS === 'web') {
-    const html = buildSingleHtml(item, opts);
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      if (!isMobileWeb()) {
-        win.onload = () => {
-          win.focus();
-          win.print();
-          win.onafterprint = () => win.close();
-        };
-      }
-    }
+    const dateStr = formatDate(item).replace(/\s/g, '_');
+    const name = `SmartCrop_Record_${item.sub_county || 'Luwero'}_${dateStr}.html`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    triggerBlobDownload(buildSingleHtml(item, opts), name);
     return;
   }
 
