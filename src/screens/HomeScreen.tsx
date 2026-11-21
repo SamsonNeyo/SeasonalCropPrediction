@@ -153,11 +153,11 @@ const HomeScreen = () => {
     }
   }, [user?.uid]);
 
-  const fetchSeasonalRecommendations = useCallback(async () => {
+  const fetchSeasonalRecommendations = useCallback(async (forceWeatherRefresh = false) => {
     try {
       setError('');
       const predictionPromise = predictBySubCounty({ sub_county: subCounty, season: seasonValue });
-      const weatherPromise = fetchWeatherContext();
+      const weatherPromise = fetchWeatherContext(forceWeatherRefresh);
       const prediction = await predictionPromise;
       setRecommendations(prediction.recommendations || []);
       setSeasonAdvice(prediction.season_advice || null);
@@ -210,7 +210,7 @@ const HomeScreen = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      await fetchSeasonalRecommendations();
+      await fetchSeasonalRecommendations(true);
     } finally {
       setRefreshing(false);
     }
@@ -441,7 +441,7 @@ const HomeScreen = () => {
               title="Could not load recommendations"
               description={error}
               actionLabel="Try again"
-              onAction={fetchSeasonalRecommendations}
+              onAction={() => fetchSeasonalRecommendations()}
             />
           ) : topRecommendation ? (
             <>
@@ -469,7 +469,7 @@ const HomeScreen = () => {
               title="No recommendations yet"
               description="Pull to refresh, or check that your sub-county is set in your profile."
               actionLabel="Refresh"
-              onAction={fetchSeasonalRecommendations}
+              onAction={() => fetchSeasonalRecommendations()}
             />
           )}
         </Animated.View>
