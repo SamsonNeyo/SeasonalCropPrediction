@@ -278,17 +278,17 @@ const HomeScreen = () => {
               <View style={styles.weatherTopBar}>
                 <View style={styles.weatherTopBadge}>
                   <Ionicons name="leaf-outline" size={11} color={styles.weatherTextPrimary.color as string} />
-                  <Text style={styles.weatherTopBadgeText}>Today · {todayLabel}</Text>
+                  <Text style={styles.weatherTopBadgeText} numberOfLines={1} ellipsizeMode="tail">Today · {todayLabel}</Text>
                 </View>
                 <View style={styles.weatherLocationPill}>
                   <Ionicons name="location" size={11} color={styles.weatherTextPrimary.color as string} />
-                  <Text style={styles.weatherLocationText} numberOfLines={1}>{subCounty}</Text>
+                  <Text style={styles.weatherLocationText} numberOfLines={1} ellipsizeMode="tail">{subCounty}</Text>
                 </View>
               </View>
 
               <View style={styles.weatherMainRow}>
                 <View style={styles.weatherTempBlock}>
-                  <Text style={styles.weatherTemp}>{weather.temperature}°</Text>
+                  <Text style={styles.weatherTemp} numberOfLines={1} adjustsFontSizeToFit>{weather.temperature}°</Text>
                   <Text style={styles.weatherCondition} numberOfLines={1}>
                     {weather.description || weather.condition}
                   </Text>
@@ -744,6 +744,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
 
     // ── Weather hero card ──
     weatherCard: {
+      minWidth: 0,
       backgroundColor: weatherCardBg,
       borderRadius: RADIUS.xl,
       borderWidth: 1,
@@ -756,11 +757,15 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     heroSkel: { marginBottom: 0 },
     weatherTopBar: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
       gap: SPACING.sm,
     },
     weatherTopBadge: {
+      minWidth: 0,
+      maxWidth: '100%',
+      flexShrink: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
@@ -772,6 +777,8 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       paddingHorizontal: SPACING.sm,
     },
     weatherTopBadgeText: {
+      minWidth: 0,
+      flexShrink: 1,
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.tiny,
       color: weatherTextPrimary,
@@ -779,6 +786,8 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       letterSpacing: 0.4,
     },
     weatherLocationPill: {
+      minWidth: 0,
+      flexShrink: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
@@ -791,12 +800,15 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
       maxWidth: 160,
     },
     weatherLocationText: {
+      minWidth: 0,
+      flexShrink: 1,
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.tiny,
       color: weatherTextPrimary,
       fontWeight: WEIGHT.bold,
     },
     weatherMainRow: {
+      minWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -805,13 +817,14 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     weatherTempBlock: { flex: 1, minWidth: 0 },
     weatherTemp: {
       fontFamily: FONT_FAMILY,
-      fontSize: 56,
-      lineHeight: 60,
+      fontSize: 52,
+      lineHeight: 56,
       fontWeight: WEIGHT.bold,
       color: weatherTextPrimary,
       letterSpacing: -1,
     },
     weatherCondition: {
+      minWidth: 0,
       marginTop: 2,
       fontFamily: FONT_FAMILY,
       fontSize: TYPE.bodySmall,
@@ -833,6 +846,7 @@ const createStyles = (c: ThemeColors, isDark: boolean) => {
     weatherTextPrimary: { color: weatherTextPrimary } as any,
     weatherMetricsRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: SPACING.sm,
     },
 
