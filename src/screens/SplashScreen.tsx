@@ -78,8 +78,8 @@ const SplashScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.bgOrbOne} />
-      <View style={styles.bgOrbTwo} />
+      <View pointerEvents="none" style={styles.bgOrbOne} />
+      <View pointerEvents="none" style={styles.bgOrbTwo} />
       <Animated.View style={[styles.content, { opacity: fadeIn, transform: [{ translateY: rise }] }]}>
         <Animated.Image
           source={require('../../assets/splash-icon.png')}
@@ -99,6 +99,7 @@ const createStyles = (c: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,
+      overflow: 'hidden',
       backgroundColor: c.background,
       justifyContent: 'center',
       alignItems: 'center',
